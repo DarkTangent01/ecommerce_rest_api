@@ -20,6 +20,7 @@ yarn install
 yarn run dev [for development]
 yarn start [for production]
 ```
+## .env
 
 ```bash
 APP_PORT = YOUR-HOST-PORT
