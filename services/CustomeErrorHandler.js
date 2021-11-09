@@ -9,18 +9,21 @@ class CustomeErrorHandler extends Error {
     return new CustomeErrorHandler(409, message);
   }
 
-  static wrongCredentials(message = 'Username or Password is wrong!') {
+  static wrongCredentials(message = "Username or Password is wrong!") {
     return new CustomeErrorHandler(401, message);
   }
 
-  static unAuthorized(message = 'unAuthorized') {
+  static unAuthorized(message = "unAuthorized") {
     return new CustomeErrorHandler(401, message);
   }
 
-  static notFound(message = '404 Not Found') {
+  static notFound(message = "404 Not Found") {
     return new CustomeErrorHandler(404, message);
   }
-  
+
+  static serverError(message = "Internal server error") {
+    return new CustomeErrorHandler(500, message);
+  }
 }
 
 export default CustomeErrorHandler;
