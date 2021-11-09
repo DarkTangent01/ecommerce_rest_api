@@ -122,6 +122,30 @@ const productController = {
 
     res.json(document);
   },
+
+  async index(req, res, next) {
+    let documents;
+    // pagination mongoose-pagination
+    try {
+      documents = await Product.find().select("-updateAt -__v");
+    } catch (err) {
+      return next(CustomeErrorHandler.serverError());
+    }
+    return res.json(documents);
+  },
+
+  async show(req, res, next) {
+    let document;
+
+    try {
+      document = Product.findOne({ _id: req.params.id }).select(
+        "-updateAt -__v"
+      );
+    } catch (err) {
+      return next(CustomeErrorHandler.serverError());
+    }
+    return res.json(document);
+  },
 };
 
 export default productController;

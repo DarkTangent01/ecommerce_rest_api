@@ -4,8 +4,7 @@ import errorHandler from "./middlewares/errorHandler";
 const app = express();
 import routes from "./routes";
 import mongoose from "mongoose";
-import path from 'path';
-
+import path from "path";
 
 // Databse Connection
 mongoose.connect(DB_URL, {
@@ -19,9 +18,10 @@ db.once("open", () => {
 
 global.appRoot = path.resolve(__dirname);
 
-app.use(express.urlencoded({extended: false}));
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use("/api", routes);
+app.use("/uploads", express.static("uploads"));
 
 app.use(errorHandler);
 app.listen(APP_PORT, () =>
