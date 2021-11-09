@@ -2,8 +2,6 @@
 
 ## APPLICATION IS UNDER DEVELOPMENT
 
-[![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
-
 ## BUILD WITH
 
 - NODE JS
