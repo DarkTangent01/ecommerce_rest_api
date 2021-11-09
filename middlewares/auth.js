@@ -19,7 +19,7 @@ const auth = async (req, res, next) => {
 
     req.user = user;
     next();
-    
+
     // req.user = {};
     // req.user._id = _id;
     // req.user.role = role;
