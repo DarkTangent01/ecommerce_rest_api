@@ -25,6 +25,7 @@ yarn start [for production]
 ```bash
 APP_PORT = YOUR-HOST-PORT
 APP_IP_ADDRESS = YOUR_HOST-IP-ADDRESS
+APP_URL = YOUR_HOST_URL example: http://localhost:5000/
 DEBUG_MODE = "true || false (true for development env and for production env set to false)"
 DB_URL = "YOUR-MONGODB-URL"
 JWT_SECRET = "YOUR_JWT_SECRET_KEY (MAKE THIS STRONG) (DO NOT MAKE SAME AS 'REFRESH_SECRET')"
