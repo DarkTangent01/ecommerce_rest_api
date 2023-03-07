@@ -24,6 +24,10 @@ class CustomeErrorHandler extends Error {
   static serverError(message = "Internal server error") {
     return new CustomeErrorHandler(500, message);
   }
+
+  static toManyRequest(message = "To many request, Try again later."){
+    return new CustomeErrorHandler(429, message); 
+  }
 }
 
 export default CustomeErrorHandler;

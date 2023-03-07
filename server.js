@@ -1,6 +1,7 @@
 import express from "express";
 import { APP_IP_ADDRESS, APP_PORT, DB_URL } from "./config";
 import errorHandler from "./middlewares/errorHandler";
+import { CustomeErrorHandler } from "./services";
 import helmet from "helmet";
 import hpp from "hpp";
 import cors from "cors";
@@ -47,7 +48,10 @@ app.use(mongoSanitize());
 // Rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 5, // limit each IP to 100 requests per windowMs
+  handler: function (req, res, next){
+    return next(CustomeErrorHandler.toManyRequest());
+  },
 });
 app.use(limiter);
 
