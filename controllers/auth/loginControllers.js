@@ -12,7 +12,8 @@ const loginController = {
       email: Joi.string().email().required(),
       password: Joi.string()
         .pattern(new RegExp("^[a-zA-A0-9]{6,12}$"))
-        .required(),
+        .required()
+        .max(12),
     });
 
     const { error } = loginSchema.validate(req.body);
@@ -42,7 +43,7 @@ const loginController = {
 
       const refresh_token = JwtService.sign(
         { _id: user._id, role: user.role },
-        "1y",
+        "7d",
         REFRESH_SECRET
       );
 
@@ -50,7 +51,8 @@ const loginController = {
 
       res.json({ access_token, refresh_token });
     } catch (err) {
-      return next(err);
+      console.error(err);
+      return next(new Error("An error occurred while logging in"));
     }
   },
 
@@ -71,7 +73,7 @@ const loginController = {
     } catch (err) {
       return next(new Error("Something went wrong in the database"));
     }
-    res.json({ status: 1, continue: "3:13:44" });
+    res.json({ message: "Successfully logged out" });
   },
 };
 

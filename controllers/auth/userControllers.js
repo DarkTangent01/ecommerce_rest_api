@@ -1,12 +1,12 @@
 import { User } from "../../models";
+import { ObjectId } from "mongodb";
 import { CustomeErrorHandler } from "../../services";
 
 const userControllers = {
   async users(req, res, next) {
     try {
-      const user = await User.findOne({ _id: req.user._id }).select(
-        "-password -updatedAt -__v"
-      );
+      const _id = new ObjectId(req.user._id);
+      const user = await User.findById(_id).select("-password");
       if (!user) {
         return next(CustomeErrorHandler.notFound());
       }

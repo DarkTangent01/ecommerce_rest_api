@@ -2,7 +2,6 @@ import { Product } from "../../models";
 import multer from "multer";
 import path from "path";
 import { CustomeErrorHandler } from "../../services";
-import Joi from "joi";
 import fs from "fs";
 import { productSchema } from "../../validators";
 
@@ -125,9 +124,9 @@ const productController = {
 
   async index(req, res, next) {
     let documents;
-    // pagination mongoose-pagination
+    // pagination ---- mongoose-pagination
     try {
-      documents = await Product.find().select("-updateAt -__v");
+      documents = await Product.find().select("-updatedAt -__v");
     } catch (err) {
       return next(CustomeErrorHandler.serverError());
     }
@@ -138,8 +137,8 @@ const productController = {
     let document;
 
     try {
-      document = Product.findOne({ _id: req.params.id }).select(
-        "-updateAt -__v"
+      document = await Product.findOne({ _id: req.params.id }).select(
+        "-updatedAt -__v"
       );
     } catch (err) {
       return next(CustomeErrorHandler.serverError());

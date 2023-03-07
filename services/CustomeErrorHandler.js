@@ -2,7 +2,7 @@ class CustomeErrorHandler extends Error {
   constructor(status, msg) {
     super();
     this.status = status;
-    this.message = msg;
+    this.message = msg.replace(/[^\w\s]/gi, '');
   }
 
   static alreadyExist(message) {

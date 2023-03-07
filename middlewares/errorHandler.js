@@ -6,7 +6,6 @@ const errorHandler = (err, req, res, next) => {
   let statusCode = 500;
   let data = {
     message: "Internal server error",
-    ...(DEBUG_MODE === "true" && { originalError: err.message }),
   };
 
   if (err instanceof ValidationError) {
@@ -21,6 +20,13 @@ const errorHandler = (err, req, res, next) => {
     data = {
       message: err.message,
     };
+  } else {
+    console.error(err);
+  }
+
+  // Validate the status code
+  if (statusCode < 100 || statusCode > 599) {
+    statusCode = 500;
   }
 
   return res.status(statusCode).json(data);

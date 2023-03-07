@@ -43,9 +43,11 @@ http://<APP_IP_ADDRESS>:<APP_PORT>/users/ [this api route is for identify the us
 
 ## Product Routes APIs
 ``` bash
-http://<APP_IP_ADDRESS>:<APP_PORT>/products/ [this api route is for register user] [Route Type: POST]
-http://<APP_IP_ADDRESS>:<APP_PORT>/products/:id [this api route is for login user] [Route Type: PUT]
-http://<APP_IP_ADDRESS>:<APP_PORT>/products/:id [this api route is for refresh the refresh_token] [Route Type: DELETE]
+http://<APP_IP_ADDRESS>:<APP_PORT>/products/ [this api route is for create products] [Route Type: POST]
+http://<APP_IP_ADDRESS>:<APP_PORT>/products/:id [this api route is for update products details] [Route Type: PUT]
+http://<APP_IP_ADDRESS>:<APP_PORT>/products/:id [this api route is for delete the product] [Route Type: DELETE]
+http://<APP_IP_ADDRESS>:<APP_PORT>/products [this api route is for retrive all products from the database] [Route Type: GET]
+http://<APP_IP_ADDRESS>:<APP_PORT>/products/:id [this api route is for retrive single products from the database] [Route Type: GET]
 ```
 
 ## DEVELOPER NAME

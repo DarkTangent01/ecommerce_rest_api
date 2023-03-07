@@ -1,9 +1,9 @@
-import Joi from "joi";
 import { CustomeErrorHandler } from "../../services";
 import { RefreshToken, User } from "../../models";
 import bcrypt from "bcrypt";
 import { JwtService } from "../../services";
 import { REFRESH_SECRET } from "../../config";
+import Joi from "joi";
 
 const registerController = {
   async register(req, res, next) {
@@ -12,9 +12,9 @@ const registerController = {
 
     const registerSchema = Joi.object({
       name: Joi.string().min(3).max(30).required(),
-      email: Joi.string().email().required(),
+      email: Joi.string().email().lowercase().required(),
       password: Joi.string()
-        .pattern(new RegExp("^[a-zA-A0-9]{6,12}$"))
+        .pattern(new RegExp("^[a-zA-Z0-9]{6,12}$"))
         .required(),
       repeat_password: Joi.ref("password"),
     });
@@ -58,7 +58,7 @@ const registerController = {
       const result = await user.save();
 
       // Token
-      access_token = JwtService.sign({ _id: result._id, role: result.role });
+      access_token = JwtService.sign({ _id: result._id, role: result.role }, "15m");
 
       refresh_token = JwtService.sign(
         { _id: result._id, role: result.role },
