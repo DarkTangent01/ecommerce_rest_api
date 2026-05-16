@@ -1,27 +1,58 @@
 import express from "express";
-import { APP_IP_ADDRESS, APP_PORT, DB_URL } from "./config";
-import errorHandler from "./middlewares/errorHandler";
-import { CustomeErrorHandler } from "./services";
+import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, DB_URL, ENABLE_QUERY_PROFILING, NODE_ENV, REQUEST_BODY_LIMIT } from "./config/index.js";
+import errorHandler from "./middlewares/errorHandler.js";
 import helmet from "helmet";
-import hpp from "hpp";
 import cors from "cors";
-import xss from "xss-clean";
-import rateLimit from "express-rate-limit";
-import mongoSanitize from "express-mongo-sanitize";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+import { generalLimiter } from "./middlewares/rateLimiters.js";
+import { CustomeErrorHandler } from "./services/index.js";
+import { requestContext, logEvent } from "./utils/requestContext.js";
+import { rawJsonBody } from "./middlewares/rawBody.js";
+import preventParameterPollution from "./middlewares/preventParameterPollution.js";
+import tenantContext from "./middlewares/tenantContext.js";
+import metricsMiddleware from "./middlewares/metricsMiddleware.js";
+import sanitizeInput from "./middlewares/sanitizeInput.js";
+import sanitizeNoSql from "./middlewares/sanitizeNoSql.js";
 
 
 const app = express();
-import routes from "./routes";
+import routes from "./routes/index.js";
 import mongoose from "mongoose";
 
-const mongodbURI = process.env.DB_URL || DB_URL;
-mongoose.connect(mongodbURI, {
-  useUnifiedTopology: true,
-});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+mongoose.set("bufferCommands", false);
+if (ENABLE_QUERY_PROFILING) {
+  mongoose.set("debug", (collection, method, query, doc) => {
+    logEvent("debug", "db.query", null, { collection, method, query, doc });
+  });
+}
+
+const connectDatabase = async () => {
+  const mongodbURI = process.env.DB_URL || DB_URL;
+  return mongoose.connect(mongodbURI, {
+    autoIndex: NODE_ENV !== "production",
+    serverSelectionTimeoutMS: 3000,
+  });
+};
+
+const startServer = async () => {
+  try {
+    await connectDatabase();
+  } catch (err) {
+    console.error(`[!] DB connection failed: ${err.message}`);
+  }
+
+  return app.listen(APP_PORT, () =>
+    console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`)
+  );
+};
 const db = mongoose.connection;
-db.on("error", console.error.bind(console, "Connection Error: "));
+db.on("error", (err) => {
+  console.error(`Connection Error: ${err.message}`);
+});
 db.once("open", () => {
   console.log("[+] DB Connected...");
 });
@@ -37,30 +68,44 @@ if (!fs.existsSync(logsDirectory)){
 }
 
 // Middleware setup
-app.use(helmet());
-app.use(hpp());
-app.use(cors());
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json({ strict: false }));
-app.use(xss());
-app.use(mongoSanitize());
-
-// Rate limiter
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  handler: function (req, res, next){
-    return next(CustomeErrorHandler.toManyRequest());
-  },
-});
-app.use(limiter);
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use(requestContext);
+app.use(tenantContext);
+app.use(metricsMiddleware);
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(preventParameterPollution);
+const allowlist = CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean);
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowlist.length === 0 || allowlist.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(CustomeErrorHandler.forbidden("CORS origin denied"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.use(express.urlencoded({ extended: false, limit: REQUEST_BODY_LIMIT, parameterLimit: 100 }));
+app.use(express.json({ strict: true, limit: REQUEST_BODY_LIMIT, verify: rawJsonBody }));
+app.use(sanitizeInput);
+app.use(sanitizeNoSql);
+app.use(generalLimiter);
 
 
 // Middleware to log requests
 
 app.use((req, res, next) => {
-  const logMessage = `${new Date().toISOString()} - ${req.method} ${req.path}\n`;
+  const logMessage = `${new Date().toISOString()} ${req.requestId} ${req.method} ${req.path}\n`;
   const logFilePath = path.join(logsDirectory, "access.log");
+  logEvent("info", "request.received", req);
 
   // Append log message to access.log file
   fs.appendFile(logFilePath, logMessage, (err) => {
@@ -72,9 +117,26 @@ app.use((req, res, next) => {
 });
 
 app.use("/api", routes);
-app.use("/uploads", express.static("uploads"));
+app.use("/api/v1", routes);
+app.use(
+  "/uploads",
+  express.static("uploads", {
+    fallthrough: false,
+    dotfiles: "deny",
+    maxAge: NODE_ENV === "production" ? "7d" : 0,
+  })
+);
+
+app.use((req, res, next) => {
+  return next(CustomeErrorHandler.notFound("Route not found"));
+});
 
 app.use(errorHandler);
-app.listen(APP_PORT, () =>
-  console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`)
-);
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+let server;
+
+if (isMain) {
+  server = await startServer();
+}
+
+export { app, server, connectDatabase, startServer };

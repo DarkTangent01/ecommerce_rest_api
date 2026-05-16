@@ -1,9 +1,10 @@
-import { CustomeErrorHandler, JwtService } from "../services";
+import { CustomeErrorHandler, JwtService } from "../services/index.js";
+import { User } from "../models/index.js";
 
 const auth = async (req, res, next) => {
   let authHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next(CustomeErrorHandler.unAuthorized());
   }
 
@@ -11,18 +12,21 @@ const auth = async (req, res, next) => {
 
   try {
     const { _id, role } = await JwtService.verify(token);
+    const user = await User.findOne({ _id, isActive: true, deletedAt: null }).select("_id role email name tenant");
 
-    const user = {
-      _id,
-      role,
+    if (!user) {
+      return next(CustomeErrorHandler.unAuthorized("Account is inactive or does not exist"));
+    }
+
+    req.user = {
+      _id: user._id,
+      role: role || user.role,
+      email: user.email,
+      name: user.name,
+      tenant: user.tenant,
     };
-
-    req.user = user;
+    req.tenant = user.tenant || req.tenant;
     next();
-
-    // req.user = {};
-    // req.user._id = _id;
-    // req.user.role = role;
   } catch (err) {
     return next(CustomeErrorHandler.unAuthorized());
   }

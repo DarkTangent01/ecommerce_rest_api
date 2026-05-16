@@ -2,7 +2,7 @@ class CustomeErrorHandler extends Error {
   constructor(status, msg) {
     super();
     this.status = status;
-    this.message = msg.replace(/[^\w\s]/gi, '');
+    this.message = String(msg || "Error").replace(/[<>{}]/g, "");
   }
 
   static alreadyExist(message) {
@@ -17,6 +17,10 @@ class CustomeErrorHandler extends Error {
     return new CustomeErrorHandler(401, message);
   }
 
+  static forbidden(message = "Forbidden") {
+    return new CustomeErrorHandler(403, message);
+  }
+
   static notFound(message = "404 Not Found") {
     return new CustomeErrorHandler(404, message);
   }
@@ -27,6 +31,10 @@ class CustomeErrorHandler extends Error {
 
   static toManyRequest(message = "To many request, Try again later."){
     return new CustomeErrorHandler(429, message); 
+  }
+
+  static badRequest(message = "Bad request") {
+    return new CustomeErrorHandler(400, message);
   }
 }
 

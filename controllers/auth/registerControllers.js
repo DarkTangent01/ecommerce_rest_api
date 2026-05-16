@@ -1,25 +1,20 @@
-import { CustomeErrorHandler } from "../../services";
-import { RefreshToken, User } from "../../models";
+import { CustomeErrorHandler } from "../../services/index.js";
+import { RefreshToken, User } from "../../models/index.js";
 import bcrypt from "bcrypt";
-import { JwtService } from "../../services";
-import { REFRESH_SECRET } from "../../config";
-import Joi from "joi";
+import { JwtService } from "../../services/index.js";
+import { ACCESS_TOKEN_TTL, BCRYPT_ROUNDS, REFRESH_SECRET, REFRESH_TOKEN_TTL } from "../../config/index.js";
+import { registerSchema } from "../../validators/index.js";
+import { successResponse } from "../../utils/apiResponse.js";
+import { trackSession } from "../../services/securityService.js";
+
+const refreshExpiry = () => {
+  const days = Number.parseInt(REFRESH_TOKEN_TTL, 10) || 7;
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+};
 
 const registerController = {
   async register(req, res, next) {
-    // register logic
-    // Validation
-
-    const registerSchema = Joi.object({
-      name: Joi.string().min(3).max(30).required(),
-      email: Joi.string().email().lowercase().required(),
-      password: Joi.string()
-        .pattern(new RegExp("^[a-zA-Z0-9]{6,12}$"))
-        .required(),
-      repeat_password: Joi.ref("password"),
-    });
-
-    const { error } = registerSchema.validate(req.body);
+    const { error, value } = registerSchema.validate(req.body);
 
     if (error) {
       return next(error);
@@ -27,7 +22,7 @@ const registerController = {
 
     // check if user is in the database already
     try {
-      const exist = await User.exists({ email: req.body.email });
+      const exist = await User.exists({ email: value.email });
       if (exist) {
         return next(
           CustomeErrorHandler.alreadyExist("This email is already taken.")
@@ -37,17 +32,15 @@ const registerController = {
       return next(err);
     }
 
-    const { name, email, password } = req.body;
-    // Hash password
+    const { name, email, password } = value;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // prepare the model
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const user = new User({
       name: name,
       email: email,
       password: hashedPassword,
+      tenant: req.tenant,
     });
 
     // save in the database
@@ -58,21 +51,22 @@ const registerController = {
       const result = await user.save();
 
       // Token
-      access_token = JwtService.sign({ _id: result._id, role: result.role }, "15m");
+      access_token = JwtService.sign({ _id: result._id, role: result.role }, ACCESS_TOKEN_TTL);
 
       refresh_token = JwtService.sign(
         { _id: result._id, role: result.role },
-        "1y",
+        REFRESH_TOKEN_TTL,
         REFRESH_SECRET
       );
 
       // refresh_token save in database and whitelist the refresh_token
-      await RefreshToken.create({ token: refresh_token });
+      const savedRefreshToken = await RefreshToken.create({ token: refresh_token, user: result._id, expiresAt: refreshExpiry() });
+      await trackSession({ user: result, refreshToken: savedRefreshToken._id, req });
     } catch (err) {
       return next(err);
     }
 
-    res.json({ access_token: access_token, refresh_token: refresh_token });
+    return successResponse(res, { access_token, refresh_token }, "Registered successfully", 201);
   },
 };
 

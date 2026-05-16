@@ -2,32 +2,33 @@
   "name": "ecommerce_rest_api",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node -r esm server.js",
-    "dev": "nodemon -r esm server.js"
+    "validate": "node scripts/check-syntax.js",
+    "test": "node tests/security.test.js && node tests/runtime.test.js",
+    "test:e2e:mongo": "node tests/e2e.mongo.test.js",
+    "audit:deps": "yarn audit",
+    "scan:security": "yarn audit && yarn validate && yarn test",
+    "load:test": "node scripts/load-test.js",
+    "chaos:plan": "node scripts/chaos-check.js",
+    "workers": "node workers/index.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "keywords": [],
   "author": "MAYANK SRIVASTAVA",
   "license": "ISC",
   "dependencies": {
-    "bcrypt": "^5.0.1",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^10.0.0",
-    "esm": "^3.2.25",
-    "express": "^4.17.1",
-    "express-mongo-sanitize": "^2.2.0",
-    "express-rate-limit": "^6.7.0",
-    "helmet": "^6.0.1",
-    "hpp": "^0.2.3",
-    "joi": "^17.4.2",
-    "jsonwebtoken": "^8.5.1",
-    "mongoose": "^6.0.12",
-    "multer": "^1.4.3",
-    "xss-clean": "^0.1.1"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.21"
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "multer": "^2.0.0"
   }
 }

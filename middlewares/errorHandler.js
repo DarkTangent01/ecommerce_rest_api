@@ -1,25 +1,25 @@
-import { DEBUG_MODE } from "../config";
-import { ValidationError } from "joi";
-import CustomeErrorHandler from "../services/CustomeErrorHandler";
+import { DEBUG_MODE } from "../config/index.js";
+import Joi from "joi";
+import CustomeErrorHandler from "../services/CustomeErrorHandler.js";
+import { errorResponse } from "../utils/apiResponse.js";
+
+const { ValidationError } = Joi;
 
 const errorHandler = (err, req, res, next) => {
   let statusCode = 500;
-  let data = {
-    message: "Internal server error",
-  };
+  let message = "Internal server error";
+  let details;
 
   if (err instanceof ValidationError) {
     statusCode = 422;
-    data = {
-      message: err.message,
-    };
-  }
-
-  if (err instanceof CustomeErrorHandler) {
+    message = "Validation failed";
+    details = err.details?.map((detail) => ({
+      field: detail.path.join("."),
+      message: detail.message.replace(/"/g, ""),
+    }));
+  } else if (err instanceof CustomeErrorHandler) {
     statusCode = err.status;
-    data = {
-      message: err.message,
-    };
+    message = err.message;
   } else {
     console.error(err);
   }
@@ -29,7 +29,11 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 500;
   }
 
-  return res.status(statusCode).json(data);
+  if (DEBUG_MODE && statusCode >= 500) {
+    details = { stack: err.stack };
+  }
+
+  return errorResponse(res, message, statusCode, details);
 };
 
 export default errorHandler;
