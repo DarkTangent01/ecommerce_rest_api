@@ -13,7 +13,12 @@ const recalculateRating = async (productId) => {
   await Product.updateOne({ _id: productId }, { $set: { ratingAverage: rating.average, ratingCount: rating.count } });
 };
 
-const reviewController = {
+class ReviewController {
+  constructor() {
+    this.index = this.index.bind(this);
+    this.create = this.create.bind(this);
+  }
+
   async index(req, res, next) {
     try {
       const reviews = await Review.find({ product: req.params.productId, tenant: req.tenant, status: "published" })
@@ -23,7 +28,7 @@ const reviewController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async create(req, res, next) {
     const { error, value } = reviewSchema.validate(req.body);
@@ -52,7 +57,7 @@ const reviewController = {
       if (err.code === 11000) return next(CustomeErrorHandler.badRequest("Review already exists"));
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default reviewController;
+export default new ReviewController();

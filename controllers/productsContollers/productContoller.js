@@ -1,16 +1,13 @@
-import { Product } from "../../models/index.js";
 import multer from "multer";
 import path from "path";
 import { CustomeErrorHandler } from "../../services/index.js";
 import fs from "fs";
 import { productSchema } from "../../validators/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
-import { buildCursorPagination, buildPagination, buildSort, nextCursorFrom } from "../../utils/pagination.js";
 import auditLogger from "../../utils/auditLogger.js";
 import { UPLOAD_MAX_BYTES } from "../../config/index.js";
 import crypto from "crypto";
-import { pickAllowedFields } from "../../utils/fieldPolicy.js";
-import { cache } from "../../utils/cache.js";
+import ProductService from "../../services/ProductService.js";
 
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -62,7 +59,16 @@ export const assertSafeImage = async (file) => {
   }
 };
 
-const productController = {
+class ProductController {
+  constructor(productService = new ProductService()) {
+    this.productService = productService;
+    this.store = this.store.bind(this);
+    this.update = this.update.bind(this);
+    this.destroy = this.destroy.bind(this);
+    this.index = this.index.bind(this);
+    this.show = this.show.bind(this);
+  }
+
   async store(req, res, next) {
     // Multipart form data
     handleMultiPartData(req, res, async (err) => {
@@ -85,26 +91,21 @@ const productController = {
         removeFile(filePath);
         return next(error);
       }
-      const allowedValue = pickAllowedFields("product", req.user.role, value);
-
-      let document;
-
       try {
-        document = await Product.create({
-          ...allowedValue,
-          image: filePath,
-          seller: req.user._id,
+        const document = await this.productService.create({
+          value,
+          filePath,
+          user: req.user,
           tenant: req.tenant,
         });
-        await cache.del("products:");
+        auditLogger("product.create", req, { product: document._id });
+        return successResponse(res, document, "Product created", 201);
       } catch (error) {
         removeFile(filePath);
         return next(error);
       }
-      auditLogger("product.create", req, { product: document._id });
-      return successResponse(res, document, "Product created", 201);
     });
-  },
+  }
 
   // Updating the products
   update(req, res, next) {
@@ -127,110 +128,50 @@ const productController = {
         removeFile(filePath);
         return next(error);
       }
-      const allowedValue = pickAllowedFields("product", req.user.role, value);
-
-      let document;
-
       try {
-        const filter = { _id: req.params.id, tenant: req.tenant, deletedAt: null };
-        if (req.user.role === "seller") {
-          filter.seller = req.user._id;
-        }
-        document = await Product.findOneAndUpdate(
-          filter,
-          {
-            ...allowedValue,
-            ...(req.file && { image: filePath }),
-          },
-          { new: true, runValidators: true }
-        );
-        if (!document) {
-          removeFile(filePath);
-          return next(CustomeErrorHandler.notFound("Product not found"));
-        }
+        const document = await this.productService.update({
+          id: req.params.id,
+          value,
+          filePath,
+          user: req.user,
+          tenant: req.tenant,
+        });
+        auditLogger("product.update", req, { product: document._id });
+        return successResponse(res, document, "Product updated");
       } catch (err) {
         removeFile(filePath);
         return next(err);
       }
-      await cache.del("products:");
-      auditLogger("product.update", req, { product: document._id });
-      return successResponse(res, document, "Product updated");
     });
-  },
+  }
 
   async destroy(req, res, next) {
-    const document = await Product.findOneAndUpdate({ _id: req.params.id, tenant: req.tenant }, { $set: { deletedAt: new Date(), isActive: false } }, { new: true });
-    if (!document) {
-      return next(CustomeErrorHandler.notFound("Product not found"));
+    try {
+      const document = await this.productService.delete({ id: req.params.id, tenant: req.tenant });
+      auditLogger("product.delete", req, { product: document._id });
+      return successResponse(res, document, "Product deleted");
+    } catch (err) {
+      return next(err);
     }
-
-    await cache.del("products:");
-
-    auditLogger("product.delete", req, { product: document._id });
-    return successResponse(res, document, "Product deleted");
-  },
+  }
 
   async index(req, res, next) {
     try {
-      const cacheKey = `products:${JSON.stringify(req.query)}`;
-      const cached = await cache.get(cacheKey);
-      if (cached) return successResponse(res, cached.data, "Products fetched", 200, cached.meta);
-
-      const useCursor = Boolean(req.query.cursor);
-      const { page, limit, skip } = buildPagination(req.query);
-      const cursorPagination = buildCursorPagination(req.query);
-      const sort = buildSort(req.query.sortBy, req.query.order, ["name", "price", "createdAt", "stock"], "-createdAt");
-      const filter = { isActive: true, tenant: req.tenant, deletedAt: null, ...cursorPagination.cursorFilter };
-
-      if (req.query.category) {
-        filter.category = req.query.category;
-      }
-      if (req.query.minPrice || req.query.maxPrice) {
-        const minPrice = Number(req.query.minPrice);
-        const maxPrice = Number(req.query.maxPrice);
-        filter.price = {};
-        if (Number.isFinite(minPrice)) filter.price.$gte = minPrice;
-        if (Number.isFinite(maxPrice)) filter.price.$lte = maxPrice;
-        if (Object.keys(filter.price).length === 0) delete filter.price;
-      }
-      if (req.query.q) {
-        filter.$text = { $search: String(req.query.q).slice(0, 100) };
-      }
-
-      const [documents, total] = await Promise.all([
-        Product.find(filter).select("-updatedAt -__v").sort(useCursor ? "-createdAt" : sort).skip(useCursor ? 0 : skip).limit(useCursor ? cursorPagination.limit : limit).lean({ getters: true }),
-        Product.countDocuments(filter),
-      ]);
-
-      const meta = {
-        page,
-        limit: useCursor ? cursorPagination.limit : limit,
-        total,
-        pages: Math.ceil(total / limit),
-        nextCursor: useCursor ? nextCursorFrom(documents) : null,
-      };
-      await cache.set(cacheKey, { data: documents, meta });
-      return successResponse(res, documents, "Products fetched", 200, meta);
+      const { data, meta } = await this.productService.list({ query: req.query, tenant: req.tenant });
+      return successResponse(res, data, "Products fetched", 200, meta);
     } catch (err) {
       return next(CustomeErrorHandler.serverError());
     }
-  },
+  }
 
   async show(req, res, next) {
-    let document;
-
     try {
-      document = await Product.findOne({ _id: req.params.id, tenant: req.tenant, deletedAt: null }).select(
-        "-updatedAt -__v"
-      );
-      if (!document) {
-        return next(CustomeErrorHandler.notFound("Product not found"));
-      }
+      const document = await this.productService.show({ id: req.params.id, tenant: req.tenant });
+      return successResponse(res, document, "Product fetched");
     } catch (err) {
-      return next(CustomeErrorHandler.serverError());
+      return next(err);
     }
-    return successResponse(res, document, "Product fetched");
-  },
-};
+  }
+}
 
-export default productController;
+export default new ProductController();

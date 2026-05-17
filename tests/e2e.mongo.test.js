@@ -1,5 +1,6 @@
 import assert from "assert";
 import crypto from "crypto";
+import fs from "fs/promises";
 import mongoose from "mongoose";
 import { app, connectDatabase } from "../server.js";
 import { User } from "../models/index.js";
@@ -21,6 +22,7 @@ const server = app.listen(0);
 const { port } = server.address();
 const baseUrl = `http://127.0.0.1:${port}/api`;
 const tenant = `tenant-${Date.now()}`;
+let uploadedImagePath;
 
 const request = async (path, options = {}) => {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -37,6 +39,15 @@ const request = async (path, options = {}) => {
 };
 
 const authHeader = (token) => ({ Authorization: `Bearer ${token}` });
+const localUploadPath = (imageUrl) => {
+  if (!imageUrl) return null;
+  try {
+    const parsed = new URL(imageUrl);
+    return parsed.pathname.replace(/^\/+/, "");
+  } catch {
+    return imageUrl;
+  }
+};
 
 try {
   const suffix = crypto.randomBytes(4).toString("hex");
@@ -91,6 +102,7 @@ try {
   });
   assert.strictEqual(result.response.status, 201, JSON.stringify(result.body));
   const productId = result.body.data._id;
+  uploadedImagePath = result.body.data.image;
 
   result = await request("/products");
   assert.strictEqual(result.response.status, 200);
@@ -196,4 +208,8 @@ try {
 } finally {
   await new Promise((resolve) => server.close(resolve));
   await mongoose.disconnect();
+  const cleanupPath = localUploadPath(uploadedImagePath);
+  if (cleanupPath) {
+    await fs.rm(cleanupPath, { force: true });
+  }
 }

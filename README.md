@@ -3,6 +3,7 @@
 An enterprise-oriented eCommerce REST API built with Node.js, Express, MongoDB, and Mongoose. The project started as a simple auth/product API and has been upgraded into a modular-monolith backend with clear service boundaries, security hardening, order/payment workflows, observability hooks, and production deployment scaffolding.
 
 The codebase is intentionally still one deployable application, but it is organized so the domains can later be extracted into independent services.
+Internally, request handling follows an object-oriented controller -> service -> repository pattern so HTTP concerns, business rules, and persistence logic remain separate.
 
 ## Table of Contents
 
@@ -36,6 +37,15 @@ Express API Gateway
   - Input sanitization and validation
   - Rate limiting
   - Auth, RBAC, step-up auth, API-key auth
+  |
+  +--> Class-based Controllers
+  |     Parse HTTP input, call services, return the existing response format
+  |
+  +--> Domain Services
+  |     Enforce business rules, authorization-sensitive workflows, idempotency, and side effects
+  |
+  +--> Repositories / DAOs
+  |     Encapsulate Mongoose queries and persistence operations
   |
   +--> Auth Domain
   |     Users, refresh tokens, sessions, device tracking, API keys
@@ -94,15 +104,32 @@ models/                    Mongoose schemas
 observability/             Metrics and tracing hooks
 plugins/                   Payment/shipping/notification plugin registry
 recommendations/           Recommendation hooks
+repositories/              Data access classes wrapping Mongoose operations
 routes/                    API route registration
 scripts/                   Validation, load test, chaos plan
 search/                    Search abstraction
-services/                  Domain services
+services/                  Domain service classes and shared service helpers
+src/                       Clean Architecture modular-monolith composition root
 tests/                     Security, runtime, and Mongo E2E tests
 utils/                     Shared helpers
 validators/                Joi schemas
 workers/                   Background worker entrypoint
 ```
+
+## OOP Layering
+
+The public API remains route-compatible, but the internals now flow through `src/modules`, `src/shared`, `src/infrastructure`, and `src/config`. Legacy top-level folders remain as compatibility shims while the application entrypoint and route composition use the new Clean Architecture layout.
+
+The internals are organized around small classes:
+
+- Controllers are exported as singleton class instances and keep HTTP-only work near the route boundary.
+- Services own business workflows such as auth token issuance, catalog writes, cart mutation, checkout, order lifecycle changes, and payment webhook processing.
+- Repositories own data access for core flows, making Mongoose usage easier to test and easier to replace if domains are extracted later.
+- Validators remain separate Joi modules so request validation stays explicit at the boundary.
+
+Current service/repository-backed flows include auth, products, cart, orders, and payments. Other controllers are also class-based and can be migrated to repository-backed services incrementally as their complexity grows.
+
+See [docs/architecture.md](docs/architecture.md) and [docs/security.md](docs/security.md) for the current module map and security model.
 
 ## Core Domains
 

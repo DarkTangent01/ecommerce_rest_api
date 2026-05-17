@@ -4,7 +4,13 @@ import { couponSchema } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import auditLogger from "../utils/auditLogger.js";
 
-const couponController = {
+class CouponController {
+  constructor() {
+    this.index = this.index.bind(this);
+    this.store = this.store.bind(this);
+    this.update = this.update.bind(this);
+  }
+
   async index(req, res, next) {
     try {
       const coupons = await Coupon.find({ tenant: req.tenant, deletedAt: null }).sort("-createdAt");
@@ -12,7 +18,7 @@ const couponController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async store(req, res, next) {
     const { error, value } = couponSchema.validate(req.body);
@@ -25,7 +31,7 @@ const couponController = {
       if (err.code === 11000) return next(CustomeErrorHandler.alreadyExist("Coupon code already exists"));
       return next(err);
     }
-  },
+  }
 
   async update(req, res, next) {
     const { error, value } = couponSchema.validate(req.body);
@@ -38,7 +44,7 @@ const couponController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default couponController;
+export default new CouponController();

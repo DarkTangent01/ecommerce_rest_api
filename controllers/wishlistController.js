@@ -2,7 +2,13 @@ import { Product, Wishlist } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 
-const wishlistController = {
+class WishlistController {
+  constructor() {
+    this.show = this.show.bind(this);
+    this.add = this.add.bind(this);
+    this.remove = this.remove.bind(this);
+  }
+
   async show(req, res, next) {
     try {
       const wishlist = await Wishlist.findOne({ user: req.user._id, tenant: req.tenant }).populate("products", "name price image stock ratingAverage ratingCount");
@@ -10,7 +16,7 @@ const wishlistController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async add(req, res, next) {
     try {
@@ -25,7 +31,7 @@ const wishlistController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async remove(req, res, next) {
     try {
@@ -38,7 +44,7 @@ const wishlistController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default wishlistController;
+export default new WishlistController();

@@ -6,7 +6,23 @@ import { queueInfo } from "../utils/queue.js";
 import { cache } from "../utils/cache.js";
 import { serviceCatalog } from "../architecture/services.js";
 
-const platformController = {
+class PlatformController {
+  constructor() {
+    this.readiness = this.readiness.bind(this);
+    this.metrics = this.metrics.bind(this);
+    this.serviceCatalog = this.serviceCatalog.bind(this);
+    this.events = this.events.bind(this);
+    this.sagas = this.sagas.bind(this);
+    this.securitySignals = this.securitySignals.bind(this);
+    this.auditTrail = this.auditTrail.bind(this);
+    this.createApiKey = this.createApiKey.bind(this);
+    this.listApiKeys = this.listApiKeys.bind(this);
+    this.signedUrl = this.signedUrl.bind(this);
+    this.validateSignedUrl = this.validateSignedUrl.bind(this);
+    this.securityHeaders = this.securityHeaders.bind(this);
+    this.stream = this.stream.bind(this);
+  }
+
   readiness(req, res) {
     return successResponse(res, {
       status: "ready",
@@ -14,7 +30,7 @@ const platformController = {
       queue: queueInfo(),
       tenant: req.tenant,
     }, "Readiness check");
-  },
+  }
 
   metrics(req, res) {
     if (req.accepts("text/plain")) {
@@ -22,11 +38,11 @@ const platformController = {
       return;
     }
     return successResponse(res, snapshotMetrics(), "Metrics fetched");
-  },
+  }
 
   serviceCatalog(req, res) {
     return successResponse(res, serviceCatalog, "Service catalog fetched");
-  },
+  }
 
   async events(req, res, next) {
     try {
@@ -35,7 +51,7 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async sagas(req, res, next) {
     try {
@@ -44,7 +60,7 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async securitySignals(req, res, next) {
     try {
@@ -53,7 +69,7 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async auditTrail(req, res, next) {
     try {
@@ -62,7 +78,7 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async createApiKey(req, res, next) {
     try {
@@ -78,7 +94,7 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async listApiKeys(req, res, next) {
     try {
@@ -87,13 +103,13 @@ const platformController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   signedUrl(req, res) {
     const path = req.query.path || "/uploads";
     const subject = req.query.subject || req.user?._id || "";
     return successResponse(res, { url: createSignedUrl({ path, tenant: req.tenant, subject }) }, "Signed URL created");
-  },
+  }
 
   validateSignedUrl(req, res) {
     const ok = verifySignedUrl({
@@ -104,7 +120,7 @@ const platformController = {
       signature: req.query.signature,
     });
     return successResponse(res, { valid: ok }, "Signed URL validation complete");
-  },
+  }
 
   securityHeaders(req, res) {
     return successResponse(res, {
@@ -114,14 +130,14 @@ const platformController = {
       referrerPolicy: Boolean(res.getHeader("Referrer-Policy")),
       requestId: res.getHeader("X-Request-Id"),
     }, "Security headers inspected");
-  },
+  }
 
   stream(req, res) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.write(`event: connected\ndata: ${JSON.stringify({ requestId: req.requestId, tenant: req.tenant })}\n\n`);
-  },
-};
+  }
+}
 
-export default platformController;
+export default new PlatformController();

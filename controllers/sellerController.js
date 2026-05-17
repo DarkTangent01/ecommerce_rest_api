@@ -1,7 +1,11 @@
 import { Order, Product } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 
-const sellerController = {
+class SellerController {
+  constructor() {
+    this.dashboard = this.dashboard.bind(this);
+  }
+
   async dashboard(req, res, next) {
     try {
       const products = await Product.find({ seller: req.user._id, tenant: req.tenant, deletedAt: null }).select("_id name stock price ratingAverage ratingCount");
@@ -20,7 +24,7 @@ const sellerController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default sellerController;
+export default new SellerController();

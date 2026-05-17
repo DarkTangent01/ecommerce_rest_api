@@ -6,7 +6,11 @@ import { assertSafeExternalUrl } from "../utils/ssrf.js";
 import auditLogger from "../utils/auditLogger.js";
 import { publishEvent } from "../infra/events/eventBus.js";
 
-const shipmentController = {
+class ShipmentController {
+  constructor() {
+    this.upsert = this.upsert.bind(this);
+  }
+
   async upsert(req, res, next) {
     const { error, value } = shipmentSchema.validate(req.body);
     if (error) return next(error);
@@ -32,7 +36,7 @@ const shipmentController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default shipmentController;
+export default new ShipmentController();

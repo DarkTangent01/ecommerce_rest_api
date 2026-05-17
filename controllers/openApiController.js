@@ -111,10 +111,15 @@ const spec = {
   },
 };
 
-const openApiController = {
-  show(req, res) {
-    res.json(spec);
-  },
-};
+class OpenApiController {
+  constructor(openApiSpec = spec) {
+    this.spec = openApiSpec;
+    this.show = this.show.bind(this);
+  }
 
-export default openApiController;
+  show(req, res) {
+    res.json(this.spec);
+  }
+}
+
+export default new OpenApiController();

@@ -1,7 +1,12 @@
 import { Tenant } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 
-const tenantController = {
+class TenantController {
+  constructor() {
+    this.current = this.current.bind(this);
+    this.upsert = this.upsert.bind(this);
+  }
+
   async current(req, res, next) {
     try {
       const tenant = await Tenant.findOne({ key: req.tenant });
@@ -9,7 +14,7 @@ const tenantController = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async upsert(req, res, next) {
     try {
@@ -22,7 +27,7 @@ const tenantController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default tenantController;
+export default new TenantController();

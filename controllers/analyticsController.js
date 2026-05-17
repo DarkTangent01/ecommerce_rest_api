@@ -1,7 +1,11 @@
 import { Order, Product, Review, User } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 
-const analyticsController = {
+class AnalyticsController {
+  constructor() {
+    this.admin = this.admin.bind(this);
+  }
+
   async admin(req, res, next) {
     try {
       const [users, products, orders, revenue, reviews] = await Promise.all([
@@ -21,7 +25,7 @@ const analyticsController = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default analyticsController;
+export default new AnalyticsController();

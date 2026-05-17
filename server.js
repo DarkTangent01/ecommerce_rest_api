@@ -1,5 +1,5 @@
 import express from "express";
-import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, DB_URL, ENABLE_QUERY_PROFILING, NODE_ENV, REQUEST_BODY_LIMIT } from "./config/index.js";
+import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT } from "./src/config/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { generalLimiter } from "./middlewares/rateLimiters.js";
-import { CustomeErrorHandler } from "./services/index.js";
+import CustomeErrorHandler from "./src/shared/errors/CustomeErrorHandler.js";
 import { requestContext, logEvent } from "./utils/requestContext.js";
 import { rawJsonBody } from "./middlewares/rawBody.js";
 import preventParameterPollution from "./middlewares/preventParameterPollution.js";
@@ -15,28 +15,14 @@ import tenantContext from "./middlewares/tenantContext.js";
 import metricsMiddleware from "./middlewares/metricsMiddleware.js";
 import sanitizeInput from "./middlewares/sanitizeInput.js";
 import sanitizeNoSql from "./middlewares/sanitizeNoSql.js";
+import { connectDatabase, mongoose, registerDatabaseEvents } from "./src/infrastructure/database/mongoose.js";
 
 
 const app = express();
-import routes from "./routes/index.js";
-import mongoose from "mongoose";
+import routes from "./src/modules/routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-mongoose.set("bufferCommands", false);
-if (ENABLE_QUERY_PROFILING) {
-  mongoose.set("debug", (collection, method, query, doc) => {
-    logEvent("debug", "db.query", null, { collection, method, query, doc });
-  });
-}
-
-const connectDatabase = async () => {
-  const mongodbURI = process.env.DB_URL || DB_URL;
-  return mongoose.connect(mongodbURI, {
-    autoIndex: NODE_ENV !== "production",
-    serverSelectionTimeoutMS: 3000,
-  });
-};
 
 const startServer = async () => {
   try {
@@ -49,13 +35,7 @@ const startServer = async () => {
     console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`)
   );
 };
-const db = mongoose.connection;
-db.on("error", (err) => {
-  console.error(`Connection Error: ${err.message}`);
-});
-db.once("open", () => {
-  console.log("[+] DB Connected...");
-});
+registerDatabaseEvents();
 
 global.appRoot = path.resolve(__dirname);
 

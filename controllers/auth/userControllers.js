@@ -3,7 +3,13 @@ import { CustomeErrorHandler } from "../../services/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import auditLogger from "../../utils/auditLogger.js";
 
-const userControllers = {
+class UserController {
+  constructor() {
+    this.users = this.users.bind(this);
+    this.exportData = this.exportData.bind(this);
+    this.deleteData = this.deleteData.bind(this);
+  }
+
   async users(req, res, next) {
     try {
       const user = await User.findById(req.user._id);
@@ -15,7 +21,7 @@ const userControllers = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async exportData(req, res, next) {
     try {
@@ -30,7 +36,7 @@ const userControllers = {
     } catch (err) {
       return next(err);
     }
-  },
+  }
 
   async deleteData(req, res, next) {
     try {
@@ -40,7 +46,7 @@ const userControllers = {
     } catch (err) {
       return next(err);
     }
-  },
-};
+  }
+}
 
-export default userControllers;
+export default new UserController();
