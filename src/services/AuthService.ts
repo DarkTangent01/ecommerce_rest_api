@@ -6,15 +6,21 @@ import { CustomeErrorHandler, JwtService } from "./index.js";
 import { recordSecuritySignal, trackSession } from "./securityService.js";
 import AuthRepository from "../repositories/AuthRepository.js";
 import type { Role } from "../types/domain.js";
+import { parseDurationMs } from "../utils/duration.js";
 
 export interface TokenPair {
   access_token: string;
   refresh_token: string;
 }
 
+export type TokenType = "access" | "refresh";
+
 export interface AccessTokenClaims {
   _id: string;
+  /** Informational only: authorization always uses the role stored on the user. */
   role?: Role;
+  /** Absent on tokens issued before this claim existed. */
+  typ?: TokenType;
 }
 
 class AuthService {
@@ -25,15 +31,15 @@ class AuthService {
   }
 
   refreshExpiry() {
-    const days = Number.parseInt(REFRESH_TOKEN_TTL, 10) || 7;
-    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    // Matches the JWT lifetime exactly (previously "12h" was read as 12 days).
+    return new Date(Date.now() + parseDurationMs(REFRESH_TOKEN_TTL));
   }
 
   createTokenPair(user: { _id: Types.ObjectId; role: Role }): TokenPair {
     const payload = { _id: user._id, role: user.role };
     return {
-      access_token: JwtService.sign(payload, ACCESS_TOKEN_TTL),
-      refresh_token: JwtService.sign(payload, REFRESH_TOKEN_TTL, REFRESH_SECRET),
+      access_token: JwtService.sign({ ...payload, typ: "access" }, ACCESS_TOKEN_TTL),
+      refresh_token: JwtService.sign({ ...payload, typ: "refresh" }, REFRESH_TOKEN_TTL, REFRESH_SECRET),
     };
   }
 
@@ -94,20 +100,28 @@ class AuthService {
   }
 
   async refresh(refreshTokenValue: string): Promise<TokenPair> {
-    const refreshToken = await this.repository.findActiveRefreshToken(refreshTokenValue);
-    if (!refreshToken) {
+    let claims: AccessTokenClaims;
+    try {
+      claims = JwtService.verify<AccessTokenClaims>(refreshTokenValue, REFRESH_SECRET);
+    } catch {
+      throw CustomeErrorHandler.unAuthorized("Invalid refresh token");
+    }
+    if (claims.typ && claims.typ !== "refresh") {
       throw CustomeErrorHandler.unAuthorized("Invalid refresh token");
     }
 
-    const { _id } = JwtService.verify<AccessTokenClaims>(refreshToken.token, REFRESH_SECRET);
-    const user = await this.repository.findUserById(_id);
+    // Rotation: the presented token is revoked atomically, so it can be exchanged exactly once.
+    const refreshToken = await this.repository.consumeRefreshToken(refreshTokenValue);
+    if (!refreshToken || String(refreshToken.user) !== String(claims._id)) {
+      throw CustomeErrorHandler.unAuthorized("Invalid refresh token");
+    }
+
+    const user = await this.repository.findUserById(claims._id);
     if (!user) {
       throw CustomeErrorHandler.unAuthorized("No user found!");
     }
 
     const tokens = this.createTokenPair(user);
-    refreshToken.revokedAt = new Date();
-    await refreshToken.save();
     await this.repository.createRefreshToken({
       token: tokens.refresh_token,
       user: user._id,

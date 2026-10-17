@@ -13,7 +13,10 @@ const auth = async (req: Request, _res: Response, next: NextFunction) => {
   const token = authHeader.split(" ")[1] ?? "";
 
   try {
-    const { _id, role } = JwtService.verify<AccessTokenClaims>(token);
+    const { _id, typ } = JwtService.verify<AccessTokenClaims>(token);
+    if (typ && typ !== "access") {
+      return next(CustomeErrorHandler.unAuthorized());
+    }
     const user = await User.findOne({ _id, isActive: true, deletedAt: null }).select("_id role email name tenant");
 
     if (!user) {
@@ -22,7 +25,8 @@ const auth = async (req: Request, _res: Response, next: NextFunction) => {
 
     req.user = {
       _id: user._id,
-      role: role || user.role,
+      // Always the stored role: a demoted user must lose privileges immediately, not when the token expires.
+      role: user.role,
       email: user.email,
       name: user.name,
       tenant: user.tenant,

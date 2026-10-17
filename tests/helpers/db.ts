@@ -18,9 +18,12 @@ export const startDb = async ({ replSet = true }: { replSet?: boolean } = {}) =>
   await mongoose.connection.syncIndexes();
 };
 
+/** Empties every collection and resets rate-limit counters, giving each test a clean slate. */
 export const clearDb = async () => {
   const collections = await mongoose.connection.db!.collections();
   await Promise.all(collections.map((collection) => collection.deleteMany({})));
+  const { resetRateLimits } = await import("./factories.js");
+  resetRateLimits();
 };
 
 export const stopDb = async () => {

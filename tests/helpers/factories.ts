@@ -5,8 +5,25 @@ import { app } from "../../src/server.js";
 import { Product, User } from "../../src/models/index.js";
 import { JwtService } from "../../src/services/index.js";
 import type { Role } from "../../src/types/domain.js";
+import {
+  authLimiter,
+  checkoutLimiter,
+  couponLimiter,
+  generalLimiter,
+  reviewLimiter,
+  sensitiveLimiter,
+} from "../../src/middlewares/rateLimiters.js";
 
 export const TENANT = "acme";
+
+const limiters = [generalLimiter, authLimiter, checkoutLimiter, sensitiveLimiter, reviewLimiter, couponLimiter];
+
+/** The production limiters stay on in tests; this clears their in-memory counters for the loopback client. */
+export const resetRateLimits = () => {
+  for (const limiter of limiters) {
+    for (const ip of ["127.0.0.1", "::ffff:127.0.0.1", "::1"]) limiter.resetKey(ip);
+  }
+};
 
 let counter = 0;
 const unique = () => `${Date.now().toString(36)}${(counter++).toString(36)}`;
