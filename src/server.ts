@@ -17,7 +17,8 @@ import tenantContext from "./middlewares/tenantContext.js";
 import metricsMiddleware from "./middlewares/metricsMiddleware.js";
 import sanitizeInput from "./middlewares/sanitizeInput.js";
 import sanitizeNoSql from "./middlewares/sanitizeNoSql.js";
-import { connectDatabase, registerDatabaseEvents } from "./infrastructure/database/mongoose.js";
+import { connectDatabase, mongoose, registerDatabaseEvents } from "./infrastructure/database/mongoose.js";
+import { isOriginAllowed, parseOriginList } from "./utils/cors.js";
 import routes from "./modules/routes.js";
 
 const app = express();
@@ -27,15 +28,52 @@ const __dirname = path.dirname(__filename);
 // Sources live in src/ (or dist/ once built); logs and uploads stay at the project root.
 const projectRoot = path.resolve(__dirname, "..");
 
-const startServer = async (): Promise<Server> => {
+/**
+ * Mongoose does not retry a failed initial connection, so the process used to run forever
+ * without a database. Retry with capped backoff; /ready reports 503 until connected.
+ */
+const connectWithRetry = async (attempt = 1): Promise<void> => {
   try {
     await connectDatabase();
   } catch (err) {
-    console.error(`[!] DB connection failed: ${(err as Error).message}`);
+    const delayMs = Math.min(30_000, 1_000 * 2 ** Math.min(attempt, 5));
+    console.error(`[!] DB connection failed (attempt ${attempt}): ${(err as Error).message}; retrying in ${delayMs}ms`);
+    setTimeout(() => void connectWithRetry(attempt + 1), delayMs).unref();
   }
-  startReservationSweeper(RESERVATION_SWEEP_SECONDS);
+};
 
-  return app.listen(APP_PORT, () => console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`));
+const installProcessHandlers = (httpServer: Server, stopSweeper: () => void) => {
+  let shuttingDown = false;
+  const shutdown = (reason: string, exitCode: number) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logEvent("info", "server.shutdown", null, { reason });
+    stopSweeper();
+    // Give in-flight requests time to finish, then force exit.
+    setTimeout(() => process.exit(exitCode || 1), 10_000).unref();
+    httpServer.close(() => {
+      void mongoose.disconnect().finally(() => process.exit(exitCode));
+    });
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM", 0));
+  process.on("SIGINT", () => shutdown("SIGINT", 0));
+  process.on("unhandledRejection", (reason) => {
+    logEvent("error", "process.unhandled_rejection", null, { reason: reason instanceof Error ? reason.stack : String(reason) });
+  });
+  process.on("uncaughtException", (err) => {
+    logEvent("error", "process.uncaught_exception", null, { error: err.stack });
+    shutdown("uncaughtException", 1);
+  });
+};
+
+const startServer = async (): Promise<Server> => {
+  await connectWithRetry();
+  const stopSweeper = startReservationSweeper(RESERVATION_SWEEP_SECONDS);
+
+  const httpServer = app.listen(APP_PORT, () => console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`));
+  installProcessHandlers(httpServer, stopSweeper);
+  return httpServer;
 };
 registerDatabaseEvents();
 
@@ -60,13 +98,11 @@ app.use(
   })
 );
 app.use(preventParameterPollution);
-const allowlist = CORS_ORIGIN.split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowlist = parseOriginList(CORS_ORIGIN);
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowlist.length === 0 || allowlist.includes(origin)) {
+      if (isOriginAllowed(origin, allowlist, NODE_ENV)) {
         return callback(null, true);
       }
       return callback(CustomeErrorHandler.forbidden("CORS origin denied"));

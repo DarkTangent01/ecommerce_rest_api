@@ -36,9 +36,13 @@ describe("error responses", () => {
   });
 
   it("includes error: null on success", async () => {
-    for (const path of ["/api/health", "/api/ready"]) {
-      const res = await request(app).get(path);
-      expect(res.body).toMatchObject({ success: true, error: null });
-    }
+    const res = await request(app).get("/api/health");
+    expect(res.body).toMatchObject({ success: true, error: null });
+  });
+
+  it("reports not-ready with 503 while the database is disconnected (audit M11)", async () => {
+    const res = await request(app).get("/api/ready");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ success: false, error: { code: "SERVICE_UNAVAILABLE", details: { database: "disconnected" } } });
   });
 });

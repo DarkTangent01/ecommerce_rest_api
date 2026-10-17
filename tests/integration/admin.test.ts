@@ -31,6 +31,27 @@ describe("tenant settings (audit H8)", () => {
   });
 });
 
+describe("signed URLs (audit M8)", () => {
+  it("signs the caller's own upload paths", async () => {
+    const { auth, user } = await createUser();
+    const res = await api().get("/api/platform/signed-url").query({ path: "/uploads/receipt.pdf" }).set(auth);
+    expect(res.status).toBe(200);
+    expect(res.body.data.url).toContain(`subject=${String(user._id)}`);
+  });
+
+  it("refuses to sign for another subject or outside /uploads", async () => {
+    const { auth } = await createUser();
+    expect((await api().get("/api/platform/signed-url").query({ path: "/uploads/a.jpg", subject: "someone-else" }).set(auth)).status).toBe(403);
+    expect((await api().get("/api/platform/signed-url").query({ path: "/admin/export" }).set(auth)).status).toBe(400);
+    expect((await api().get("/api/platform/signed-url").query({ path: "/uploads/../.env" }).set(auth)).status).toBe(400);
+  });
+
+  it("lets an admin sign on behalf of a user", async () => {
+    const { auth } = await createUser({ role: "admin" });
+    expect((await api().get("/api/platform/signed-url").query({ path: "/uploads/a.jpg", subject: "user-42" }).set(auth)).status).toBe(200);
+  });
+});
+
 describe("API key creation (audit M7)", () => {
   it("validates the body instead of failing with 500", async () => {
     const { auth } = await createUser({ role: "admin" });

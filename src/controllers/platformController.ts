@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { ApiKey, AuditLog, DomainEvent, SagaInstance, SecuritySignal } from "../models/index.js";
-import { successResponse } from "../utils/apiResponse.js";
+import mongoose from "mongoose";
+import { errorResponse, successResponse } from "../utils/apiResponse.js";
+import { CustomeErrorHandler } from "../services/index.js";
 import { createScopedApiKey, createSignedUrl, verifySignedUrl } from "../services/securityService.js";
 import { prometheusText, snapshotMetrics } from "../observability/metrics.js";
 import { queueInfo } from "../utils/queue.js";
@@ -29,10 +31,16 @@ class PlatformController {
   }
 
   readiness(req: Request, res: Response) {
+    // Readiness must reflect the database: load balancers route traffic based on it.
+    const dbState = mongoose.connection.readyState;
+    if (dbState !== mongoose.ConnectionStates.connected) {
+      return errorResponse(res, "Service not ready", 503, { database: mongoose.ConnectionStates[dbState] }, "SERVICE_UNAVAILABLE");
+    }
     return successResponse(
       res,
       {
         status: "ready",
+        database: "connected",
         cache: cache.backend,
         queue: queueInfo(),
         tenant: req.tenant,
@@ -117,10 +125,24 @@ class PlatformController {
     }
   }
 
-  signedUrl(req: Request, res: Response) {
-    const path = queryString(req.query.path) || "/uploads";
-    const subject = queryString(req.query.subject) || (req.user?._id ? String(req.user._id) : "");
-    return successResponse(res, { url: createSignedUrl({ path, tenant: req.tenant, subject }) }, "Signed URL created");
+  signedUrl(req: Request, res: Response, next: NextFunction) {
+    try {
+      assertAuthed(req);
+      const path = queryString(req.query.path) || "/uploads";
+      // Only upload paths can be signed, and only an admin may sign on behalf of someone else.
+      if (!/^\/uploads(\/[\w.-]+)*$/.test(path) || path.includes("..")) {
+        throw CustomeErrorHandler.badRequest("Only /uploads paths can be signed");
+      }
+      const ownSubject = String(req.user._id);
+      const requested = queryString(req.query.subject);
+      if (requested && requested !== ownSubject && req.user.role !== "admin") {
+        throw CustomeErrorHandler.forbidden("Cannot sign URLs for another subject");
+      }
+      const subject = requested || ownSubject;
+      return successResponse(res, { url: createSignedUrl({ path, tenant: req.tenant, subject }) }, "Signed URL created");
+    } catch (err) {
+      return next(err);
+    }
   }
 
   validateSignedUrl(req: Request, res: Response) {
