@@ -2,10 +2,15 @@ import crypto from "crypto";
 import { WEBHOOK_SECRET } from "../config/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
 
-export const signPayload = (payload, timestamp, secret = WEBHOOK_SECRET) =>
+export const signPayload = (payload: string, timestamp: string | number, secret = WEBHOOK_SECRET): string =>
   crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
 
-export const verifyWebhookSignature = (rawPayload, signature, timestamp, toleranceSeconds = 300) => {
+export const verifyWebhookSignature = (
+  rawPayload: string | undefined,
+  signature: string | undefined,
+  timestamp: string | undefined,
+  toleranceSeconds = 300
+): void => {
   if (!rawPayload || !signature || !timestamp) {
     throw CustomeErrorHandler.unAuthorized("Missing webhook signature");
   }

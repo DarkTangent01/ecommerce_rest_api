@@ -27,6 +27,8 @@ export default tseslint.config(
       },
     },
     rules: {
+      // In-memory adapters (cache, redis, queue) keep async signatures to match their real backends.
+      "@typescript-eslint/require-await": "off",
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": ["error", { checksVoidReturn: { arguments: false } }],
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
@@ -36,7 +38,6 @@ export default tseslint.config(
     // Test fakes return plain values from async methods, and supertest bodies are untyped JSON.
     files: ["tests/**/*.ts"],
     rules: {
-      "@typescript-eslint/require-await": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-argument": "off",

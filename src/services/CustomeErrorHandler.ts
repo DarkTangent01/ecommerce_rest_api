@@ -1,11 +1,13 @@
 class CustomeErrorHandler extends Error {
-  constructor(status, msg) {
+  status: number;
+
+  constructor(status: number, msg?: string) {
     super();
     this.status = status;
     this.message = String(msg || "Error").replace(/[<>{}]/g, "");
   }
 
-  static alreadyExist(message) {
+  static alreadyExist(message?: string) {
     return new CustomeErrorHandler(409, message);
   }
 
@@ -29,8 +31,8 @@ class CustomeErrorHandler extends Error {
     return new CustomeErrorHandler(500, message);
   }
 
-  static toManyRequest(message = "To many request, Try again later."){
-    return new CustomeErrorHandler(429, message); 
+  static toManyRequest(message = "To many request, Try again later.") {
+    return new CustomeErrorHandler(429, message);
   }
 
   static badRequest(message = "Bad request") {

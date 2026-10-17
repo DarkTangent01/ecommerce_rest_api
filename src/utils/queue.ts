@@ -1,9 +1,17 @@
 import { QUEUE_BACKEND, REDIS_URL } from "../config/index.js";
 
-const jobs = [];
+export interface Job {
+  id: string;
+  name: string;
+  payload: unknown;
+  status: "queued" | "running" | "done" | "failed";
+  createdAt: Date;
+}
 
-export const enqueueJob = async (name, payload) => {
-  const job = {
+const jobs: Job[] = [];
+
+export const enqueueJob = async (name: string, payload: unknown): Promise<Job> => {
+  const job: Job = {
     id: `${Date.now()}-${jobs.length + 1}`,
     name,
     payload,

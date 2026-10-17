@@ -1,10 +1,12 @@
-export const startSpan = (name, req, attributes = {}) => ({
+import type { Request } from "express";
+
+export const startSpan = (name: string, req?: Partial<Request> | null, attributes: Record<string, unknown> = {}) => ({
   name,
   traceId: req?.correlationId || req?.requestId,
   spanId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   attributes,
   startedAt: Date.now(),
-  end(extra = {}) {
+  end(extra: Record<string, unknown> = {}) {
     return {
       name,
       traceId: this.traceId,

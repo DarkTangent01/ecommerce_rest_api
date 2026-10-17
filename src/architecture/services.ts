@@ -1,4 +1,10 @@
-export const serviceCatalog = {
+export interface ServiceBoundary {
+  owns: string[];
+  publishes: string[];
+  consumes: string[];
+}
+
+export const serviceCatalog: Record<string, ServiceBoundary> = {
   auth: {
     owns: ["users", "refreshTokens", "sessions", "apiKeys"],
     publishes: ["auth.login_failed", "auth.login_succeeded", "user.deleted"],
@@ -26,7 +32,7 @@ export const serviceCatalog = {
   },
 };
 
-export const serviceBoundaryForRoute = (path = "") => {
+export const serviceBoundaryForRoute = (path = ""): string => {
   if (path.includes("/login") || path.includes("/register") || path.includes("/users")) return "auth";
   if (path.includes("/products") || path.includes("/wishlist") || path.includes("/reviews")) return "catalog";
   if (path.includes("/orders") || path.includes("/cart") || path.includes("/coupons")) return "order";

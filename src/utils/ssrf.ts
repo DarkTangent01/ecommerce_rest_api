@@ -11,12 +11,12 @@ const privateHostPatterns = [
   /^\[?::1\]?$/,
 ];
 
-export const assertSafeExternalUrl = (value) => {
+export const assertSafeExternalUrl = (value: string | undefined | null): void => {
   if (!value) return;
-  let parsed;
+  let parsed: URL;
   try {
     parsed = new URL(value);
-  } catch (err) {
+  } catch {
     throw CustomeErrorHandler.badRequest("Invalid URL");
   }
 

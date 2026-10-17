@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const required = ["DB_URL", "JWT_SECRET", "REFRESH_SECRET"];
+const required = ["DB_URL", "JWT_SECRET", "REFRESH_SECRET"] as const;
 
 if (process.env.NODE_ENV === "production") {
   required.forEach((key) => {
@@ -11,13 +11,13 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-const toBool = (value, fallback = false) => {
+const toBool = (value: string | undefined, fallback = false): boolean => {
   if (value === undefined) return fallback;
   return String(value).toLowerCase() === "true";
 };
 
-const toInt = (value, fallback) => {
-  const parsed = Number.parseInt(value, 10);
+const toInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
