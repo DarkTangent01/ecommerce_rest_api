@@ -5,4 +5,5 @@ export { checkoutSchema, cancelOrderSchema, refundOrderSchema } from "./orderVal
 export { couponSchema } from "./couponValidator.js";
 export { reviewSchema } from "./reviewValidator.js";
 export { shipmentSchema } from "./shipmentValidator.js";
+export { tenantSchema, apiKeySchema } from "./platformValidator.js";
 export { validate, RequestValidationError } from "./common.js";

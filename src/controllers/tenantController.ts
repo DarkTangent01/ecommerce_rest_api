@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { Tenant } from "../models/index.js";
+import { CustomeErrorHandler } from "../services/index.js";
 import { successResponse } from "../utils/apiResponse.js";
+import { tenantSchema, validate } from "../validators/index.js";
 
 class TenantController {
   constructor() {
@@ -18,13 +20,22 @@ class TenantController {
   }
 
   async upsert(req: Request, res: Response, next: NextFunction) {
+    const { error, value } = validate(tenantSchema, req.body);
+    if (error) return next(error);
+
+    // An admin manages only the tenant they authenticated into; `key` in the body used to let
+    // them create or overwrite any other tenant.
+    if (value.key && value.key !== req.tenant) {
+      return next(CustomeErrorHandler.forbidden("Cannot modify another tenant"));
+    }
+
     try {
-      // TODO: unvalidated mass assignment across tenants (audit H8); typed loosely until that fix.
-      const body = (req.body ?? {}) as Record<string, unknown> & { key?: string };
+      const { key: _ignored, config, ...fields } = value;
+      const configUpdate = Object.fromEntries(Object.entries(config ?? {}).map(([field, v]) => [`config.${field}`, v]));
       const tenant = await Tenant.findOneAndUpdate(
-        { key: String(body.key || req.tenant).toLowerCase() },
-        { ...body, key: String(body.key || req.tenant).toLowerCase() },
-        { upsert: true, new: true, runValidators: true }
+        { key: req.tenant },
+        { $set: { ...fields, ...configUpdate, key: req.tenant } },
+        { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
       );
       return successResponse(res, tenant, "Tenant saved");
     } catch (err) {

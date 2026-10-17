@@ -7,6 +7,7 @@ import { queueInfo } from "../utils/queue.js";
 import { cache } from "../utils/cache.js";
 import { serviceCatalog } from "../architecture/services.js";
 import { assertAuthed } from "../types/http.js";
+import { apiKeySchema, validate } from "../validators/index.js";
 
 const queryString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
@@ -89,10 +90,11 @@ class PlatformController {
   }
 
   async createApiKey(req: Request, res: Response, next: NextFunction) {
+    const { error, value } = validate(apiKeySchema, req.body);
+    if (error) return next(error);
     try {
       assertAuthed(req);
-      // TODO: unvalidated body (audit M7); typed loosely until the Zod schema lands with that fix.
-      const { name, scopes = [], expiresAt } = req.body as { name: string; scopes?: string[]; expiresAt?: Date };
+      const { name, scopes, expiresAt } = value;
       const { apiKey, key } = await createScopedApiKey({
         name,
         tenant: req.tenant,
