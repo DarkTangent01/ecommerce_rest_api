@@ -35,6 +35,14 @@ export default tseslint.config(
     },
   },
   {
+    // Controller singletons bind every handler in their constructor, so passing
+    // `controller.method` to the router is safe.
+    files: ["src/modules/**/routes.ts"],
+    rules: {
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
+  {
     // Test fakes return plain values from async methods, and supertest bodies are untyped JSON.
     files: ["tests/**/*.ts"],
     rules: {
