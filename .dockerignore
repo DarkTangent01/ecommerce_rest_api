@@ -1,4 +1,8 @@
 node_modules
+dist
+coverage
+frontend
+uploads
 .git
 .vs
 logs
