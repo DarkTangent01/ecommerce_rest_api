@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Response } from "express";
+import { Types } from "mongoose";
 import { describe, expect, it } from "vitest";
 
 import { registerSchema, loginSchema, productSchema } from "../../src/validators/index.js";
@@ -67,8 +69,9 @@ describe("authorization helpers", () => {
 
   it("blocks a seller from an admin-only route", () => {
     let status: number | undefined;
-    // TODO: the middleware only reads req.user; a full Request is not needed for this unit test.
-    authorize("admin")({ user: { role: "seller" } }, {}, (err?: unknown) => {
+    const seller = { _id: new Types.ObjectId(), role: "seller" as const, email: "s@example.com", name: "Seller", tenant: "default" };
+    // The middleware never touches the response object.
+    authorize("admin")({ user: seller }, {} as Response, (err?: unknown) => {
       status = (err as { status?: number } | undefined)?.status;
     });
     expect(status).toBe(403);

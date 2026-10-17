@@ -2,13 +2,13 @@ import rateLimit from "express-rate-limit";
 import { CustomeErrorHandler } from "../services/index.js";
 import { redisClient } from "../infra/redis/redisClient.js";
 
-const createLimiter = (windowMs, max, message) =>
+const createLimiter = (windowMs: number, max: number, message: string) =>
   rateLimit({
     windowMs,
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    handler(req, res, next) {
+    handler(_req, _res, next) {
       return next(CustomeErrorHandler.toManyRequest(message));
     },
   });

@@ -1,6 +1,7 @@
+import type { NextFunction, Request, Response } from "express";
 import { CustomeErrorHandler } from "../services/index.js";
 
-const hasUnsafeKey = (value) => {
+const hasUnsafeKey = (value: unknown): boolean => {
   if (Array.isArray(value)) {
     return value.some(hasUnsafeKey);
   }
@@ -12,7 +13,7 @@ const hasUnsafeKey = (value) => {
   return false;
 };
 
-const sanitizeNoSql = (req, res, next) => {
+const sanitizeNoSql = (req: Request, _res: Response, next: NextFunction) => {
   if (hasUnsafeKey(req.body) || hasUnsafeKey(req.query) || hasUnsafeKey(req.params)) {
     return next(CustomeErrorHandler.badRequest("Unsafe query payload"));
   }
