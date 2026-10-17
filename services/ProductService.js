@@ -71,7 +71,9 @@ class ProductService {
       if (Object.keys(filter.price).length === 0) delete filter.price;
     }
     if (query.q) {
-      filter.$text = { $search: String(query.q).slice(0, 100) };
+      const q = String(query.q).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const search = new RegExp(q, "i");
+      filter.$or = [{ name: search }, { description: search }, { category: search }, { sku: search }];
     }
 
     const [data, total] = await Promise.all([
