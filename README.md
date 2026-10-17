@@ -78,12 +78,12 @@ Cross-cutting infrastructure:
 
 ## Tech Stack
 
-- Node.js with native ES modules
+- TypeScript (strict) on Node.js 20+, native ES modules
 - Express.js
 - MongoDB and Mongoose
 - JWT access tokens and rotating refresh tokens
 - bcrypt password hashing
-- Joi request validation
+- Zod request and environment validation
 - Multer file uploads
 - Helmet secure headers
 - Express rate limiting
@@ -93,39 +93,35 @@ Cross-cutting infrastructure:
 ## Project Structure
 
 ```text
-architecture/              Service boundary map
-config/                    Environment config and defaults
-controllers/               HTTP controllers by feature/domain
+src/server.ts              Express app and process entry point
+src/config/                Zod-validated environment config (env.schema.ts)
+src/types/                 Domain types (User, Product, Cart, Order, Payment, ...) and Express augmentation
+src/modules/               Route registration per domain (auth, catalog, cart, order, payment, ...)
+src/controllers/           HTTP controllers by feature/domain
+src/services/              Domain services (auth, cart, orders, payments, inventory, coupons, security)
+src/repositories/          Data access classes wrapping Mongoose operations
+src/models/                Typed Mongoose schemas
+src/middlewares/           Auth, RBAC, step-up, idempotency, sanitization, rate limits, errors
+src/validators/            Zod schemas (types are inferred from them)
+src/infra/ src/infrastructure/  DB connection/transactions, event bus, locks, Redis adapter, saga orchestrator
+src/shared/                AppError and shared re-exports
+src/utils/                 Shared helpers (money, pagination, cache, webhooks, ...)
+src/architecture/ fraud/ observability/ plugins/ recommendations/ search/ workers/
+scripts/                   Validation, load test, chaos plan, DB migrations
+tests/                     Vitest unit + Supertest integration tests (in-memory MongoDB)
 docs/                      Operational docs, DR plan
-fraud/                     Fraud detection hooks
-infra/                     Service client, event bus, locks, Redis adapter, saga orchestrator
-middlewares/               Auth, RBAC, sanitization, rate limits, tenant context, metrics
-models/                    Mongoose schemas
-observability/             Metrics and tracing hooks
-plugins/                   Payment/shipping/notification plugin registry
-recommendations/           Recommendation hooks
-repositories/              Data access classes wrapping Mongoose operations
-routes/                    API route registration
-scripts/                   Validation, load test, chaos plan
-search/                    Search abstraction
-services/                  Domain service classes and shared service helpers
-src/                       Clean Architecture modular-monolith composition root
-tests/                     Security, runtime, and Mongo E2E tests
-utils/                     Shared helpers
-validators/                Joi schemas
-workers/                   Background worker entrypoint
 ```
 
 ## OOP Layering
 
-The public API remains route-compatible, but the internals now flow through `src/modules`, `src/shared`, `src/infrastructure`, and `src/config`. Legacy top-level folders remain as compatibility shims while the application entrypoint and route composition use the new Clean Architecture layout.
+The public API remains route-compatible, but the internals now flow through `src/modules`, `src/shared`, `src/infrastructure`, and `src/config`. All source code lives under `src/` and is compiled to `dist/`; see [MIGRATION_NOTES.md](MIGRATION_NOTES.md) for the JavaScript-to-TypeScript migration.
 
 The internals are organized around small classes:
 
 - Controllers are exported as singleton class instances and keep HTTP-only work near the route boundary.
 - Services own business workflows such as auth token issuance, catalog writes, cart mutation, checkout, order lifecycle changes, and payment webhook processing.
 - Repositories own data access for core flows, making Mongoose usage easier to test and easier to replace if domains are extracted later.
-- Validators remain separate Joi modules so request validation stays explicit at the boundary.
+- Validators are Zod schemas at the request boundary; handler input types are inferred from them.
 
 Current service/repository-backed flows include auth, products, cart, orders, and payments. Other controllers are also class-based and can be migrated to repository-backed services incrementally as their complexity grows.
 
@@ -242,16 +238,25 @@ Create environment file:
 cp .env.example .env
 ```
 
-Start in development mode:
+Start in development mode (TypeScript via tsx, auto-reload):
 
 ```bash
 yarn dev
 ```
 
-Start normally:
+Build and start the compiled app:
 
 ```bash
+yarn build
 yarn start
+```
+
+Outside production, secrets left empty in `.env` get a random per-process value. In production all of `JWT_SECRET`, `REFRESH_SECRET`, `WEBHOOK_SECRET`, `SERVICE_JWT_SECRET` and `SIGNED_URL_SECRET` are required (32+ characters, all different) and the process refuses to start otherwise.
+
+Existing databases must run the reservation index migration once (see MIGRATION_NOTES.md):
+
+```bash
+DB_URL=mongodb://... yarn migrate:reservations-ttl
 ```
 
 Default API URL:
@@ -665,17 +670,15 @@ docs/DISASTER_RECOVERY.md
 
 ## Testing and Validation
 
-Run syntax/import validation:
+Type-check, lint and test:
 
 ```bash
-yarn validate
-```
-
-Run unit/runtime security tests:
-
-```bash
+yarn typecheck
+yarn lint
 yarn test
 ```
+
+`yarn test` runs Vitest unit tests and Supertest integration tests against an in-memory MongoDB (`mongodb-memory-server`, both replica-set and standalone modes). No local MongoDB is needed; the first run downloads a `mongod` binary.
 
 Run dependency audit:
 
@@ -687,25 +690,6 @@ Run all security checks:
 
 ```bash
 yarn scan:security
-```
-
-Run MongoDB E2E test:
-
-```bash
-yarn test:e2e:mongo
-```
-
-The Mongo E2E test expects MongoDB on `DB_URL`. Example:
-
-```bash
-DB_URL=mongodb://127.0.0.1:27017/ecommerce_rest_api_validation_runtime yarn test:e2e:mongo
-```
-
-On PowerShell:
-
-```powershell
-$env:DB_URL="mongodb://127.0.0.1:27017/ecommerce_rest_api_validation_runtime"
-yarn test:e2e:mongo
 ```
 
 Run load test:
@@ -736,8 +720,8 @@ docker run --env-file .env -p 5000:5000 ecommerce-rest-api
 
 Dockerfile properties:
 
-- Uses `node:18-alpine`.
-- Installs production dependencies.
+- Compiles TypeScript in a `node:20-alpine` build stage; runs `dist/` on `node:18-alpine` (Node 20 runtime upgrade pending).
+- Installs production dependencies only in the runtime image.
 - Runs as non-root `appuser`.
 - Includes API healthcheck.
 - Does not bake secrets into the image.
@@ -769,10 +753,13 @@ This is SDK-generation ready at a structural level and includes security schemes
 ```bash
 yarn install
 yarn dev
+yarn build
 yarn start
-yarn validate
+yarn typecheck
+yarn lint
 yarn test
-yarn test:e2e:mongo
+yarn validate
+yarn migrate:reservations-ttl
 yarn audit
 yarn scan:security
 yarn workers
@@ -784,11 +771,7 @@ yarn chaos:plan
 
 Validated locally with:
 
-- `yarn validate`
-- `yarn test`
-- `yarn audit`
-- `yarn scan:security`
-- `yarn test:e2e:mongo`
-- Live startup probes for `/api/health`, `/api/ready`, `/api/openapi.json`, and `/api/v1/health`
+- `yarn typecheck`, `yarn lint`, `yarn test` (137 tests), `yarn build`
+- The compiled app started with `NODE_ENV=production` against a MongoDB replica set, probed via `/api/ready`, `/api/health`, register, profile, products, malformed JSON and CORS
 
 The API is ready for local development and staging validation. Production deployment should provide real secrets, MongoDB replica set mode, Redis, centralized logs, and a real payment provider.
