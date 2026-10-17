@@ -1,119 +1,79 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import {
-  LucideHeart,
-  LucideLayoutDashboard,
-  LucideLogOut,
-  LucideMenu,
-  LucidePackage,
-  LucideSearch,
-  LucideShoppingBag,
-  LucideShoppingCart,
-  LucideUserRound,
-  LucideX,
-} from '@lucide/angular';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { MatBadgeModule } from '@angular/material/badge';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
-import { ToastComponent } from '../../shared/components/toast.component';
-import { CartStateService } from '../cart/cart-state.service';
+import { CartStore } from '../cart/cart.store';
+import { APP_SETTINGS } from '../config/app.config';
+import { LoadingService } from '../loading/loading.service';
 
 @Component({
   selector: 'app-shell',
   imports: [
     RouterOutlet,
-    FormsModule,
     RouterLink,
     RouterLinkActive,
-    ToastComponent,
-    LucideMenu,
-    LucideX,
-    LucideShoppingBag,
-    LucideShoppingCart,
-    LucideHeart,
-    LucideUserRound,
-    LucideLayoutDashboard,
-    LucidePackage,
-    LucideLogOut,
-    LucideSearch,
+    ReactiveFormsModule,
+    MatToolbarModule,
+    MatButtonModule,
+    MatIconModule,
+    MatBadgeModule,
+    MatMenuModule,
+    MatSidenavModule,
+    MatListModule,
+    MatDividerModule,
+    MatProgressBarModule,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <header class="topbar">
-      <div class="topbar-main">
-        <a routerLink="/" class="brand">
-          <span class="brand-mark">S</span>
-          <span>ShopSphere</span>
-        </a>
-        <form class="global-search" (ngSubmit)="search()">
-          <select name="category" [(ngModel)]="category">
-            <option value="">All</option>
-            @for (item of categories; track item) {
-              <option [value]="item">{{ item }}</option>
-            }
-          </select>
-          <input name="searchTerm" [(ngModel)]="searchTerm" placeholder="Search for products, brands and more" />
-          <button type="submit" aria-label="Search"><svg lucideSearch></svg></button>
-        </form>
-      </div>
-      <div class="topbar-actions">
-        <a class="desktop-link" routerLink="/products" routerLinkActive="active">Shop</a>
-        <a class="desktop-link" routerLink="/orders" routerLinkActive="active">Orders</a>
-        @if (auth.isAuthenticated()) {
-          <a class="icon-link" routerLink="/wishlist" aria-label="Wishlist"><svg lucideHeart></svg></a>
-          <a class="icon-link cart-link" routerLink="/cart" aria-label="Cart"><svg lucideShoppingCart></svg><span>{{ cart.count() }}</span></a>
-          <a class="account-link" routerLink="/profile" aria-label="Profile"><svg lucideUserRound></svg><span>{{ auth.user()?.name || 'Account' }}</span></a>
-          <button class="icon-button" type="button" (click)="auth.logout()" aria-label="Logout"><svg lucideLogOut></svg></button>
-        } @else {
-          <a class="button ghost" routerLink="/login">Log in</a>
-          <a class="button primary" routerLink="/register">Sign up</a>
-        }
-        <button class="icon-button mobile-only" type="button" (click)="menuOpen.set(!menuOpen())" aria-label="Menu">
-          @if (menuOpen()) { <svg lucideX></svg> } @else { <svg lucideMenu></svg> }
-        </button>
-      </div>
-    </header>
-
-    @if (menuOpen()) {
-      <aside class="mobile-drawer">
-        <a routerLink="/products" (click)="menuOpen.set(false)"><svg lucideShoppingBag></svg> Products</a>
-        <a routerLink="/cart" (click)="menuOpen.set(false)"><svg lucideShoppingCart></svg> Cart</a>
-        <a routerLink="/wishlist" (click)="menuOpen.set(false)"><svg lucideHeart></svg> Wishlist</a>
-        <a routerLink="/orders" (click)="menuOpen.set(false)"><svg lucidePackage></svg> Orders</a>
-        @if (isSeller()) { <a routerLink="/seller" (click)="menuOpen.set(false)"><svg lucideLayoutDashboard></svg> Seller</a> }
-        @if (isAdmin()) { <a routerLink="/admin" (click)="menuOpen.set(false)"><svg lucideLayoutDashboard></svg> Admin</a> }
-      </aside>
-    }
-
-    <main>
-      <router-outlet />
-    </main>
-    <app-toast-host />
-  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './app-shell.component.html',
+  styleUrl: './app-shell.component.scss',
 })
 export class AppShellComponent {
   readonly auth = inject(AuthService);
-  readonly cart = inject(CartStateService);
+  readonly cart = inject(CartStore);
+  readonly loading = inject(LoadingService);
+  readonly appName = inject(APP_SETTINGS).appName;
   private readonly router = inject(Router);
-  readonly menuOpen = signal(false);
-  readonly isAdmin = computed(() => this.auth.role() === 'admin');
+  private readonly main = viewChild.required<ElementRef<HTMLElement>>('main');
+
+  readonly isHandset = toSignal(inject(BreakpointObserver).observe('(max-width: 767.98px)').pipe(map((state) => state.matches)), {
+    initialValue: false,
+  });
+  readonly drawerOpen = signal(false);
+  readonly isAdmin = computed(() => this.auth.hasRole('admin'));
   readonly isSeller = computed(() => this.auth.hasRole('seller', 'admin'));
-  readonly categories = ['Fashion', 'Electronics', 'Home', 'Beauty', 'Sports'];
-  searchTerm = '';
-  category = '';
+  readonly search = new FormControl('', { nonNullable: true });
 
   constructor() {
-    if (this.auth.isAuthenticated()) {
-      this.auth.loadProfile().subscribe();
-      this.cart.load();
-    }
+    // After each navigation: close the drawer and move focus to the new page for screen readers.
+    this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
+      this.drawerOpen.set(false);
+      queueMicrotask(() => this.main().nativeElement.focus({ preventScroll: true }));
+    });
   }
 
-  search(): void {
-    void this.router.navigate(['/products'], {
-      queryParams: {
-        q: this.searchTerm || null,
-        category: this.category || null,
-      },
-    });
+  submitSearch(): void {
+    const q = this.search.value.trim();
+    void this.router.navigate(['/products'], { queryParams: { q: q || null } });
+  }
+
+  skipToContent(event: Event): void {
+    event.preventDefault();
+    this.main().nativeElement.focus();
+  }
+
+  logout(): void {
+    this.auth.logout('/');
   }
 }
