@@ -173,4 +173,4 @@ No routes were added, removed or renamed. Response fields were only **added**. T
 - Prettier is configured but has not been run over the existing code, to keep these diffs reviewable.
 - `frontend/` (Angular admin UI) was out of scope and is untouched (it was already untracked).
 - Graceful shutdown was not exercised end to end (Windows has no SIGTERM).
-- Four legacy one-line wrappers (`tests/security/security.test.js`, `tests/unit/oop.test.js`, `tests/integration/runtime.test.js`, `tests/e2e/mongo.test.js`) import files that no longer exist and are not run by anything. They are **left in place pending your OK to delete them**.
+- The four legacy one-line test wrappers (`tests/security/security.test.js`, `tests/unit/oop.test.js`, `tests/integration/runtime.test.js`, `tests/e2e/mongo.test.js`) were deleted with approval; the tests they wrapped live on as the Vitest suites above.
