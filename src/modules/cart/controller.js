@@ -1,1 +1,1 @@
-export { default as cartController } from "../../../controllers/cartController.js";
+export { default as cartController } from "../../controllers/cartController.js";

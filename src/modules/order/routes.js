@@ -1,6 +1,6 @@
 import { orderController } from "./controller.js";
 import { auth, checkoutLimiter, idempotency, sensitiveLimiter, stepUpAuth } from "./policy.js";
-import validateObjectId from "../../../middlewares/validateObjectId.js";
+import validateObjectId from "../../middlewares/validateObjectId.js";
 
 export const registerOrderRoutes = (router) => {
   router.post("/orders/checkout", auth, stepUpAuth, checkoutLimiter, idempotency, orderController.checkout);

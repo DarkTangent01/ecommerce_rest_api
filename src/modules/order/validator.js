@@ -1,1 +1,1 @@
-export { checkoutSchema, orderCancelSchema, refundRequestSchema } from "../../../validators/index.js";
+export { checkoutSchema, orderCancelSchema, refundRequestSchema } from "../../validators/index.js";

@@ -1,1 +1,1 @@
-export { default } from "../../../services/CustomeErrorHandler.js";
+export { default } from "../../services/CustomeErrorHandler.js";

@@ -1,1 +1,1 @@
-export { default as sellerController } from "../../../controllers/sellerController.js";
+export { default as sellerController } from "../../controllers/sellerController.js";

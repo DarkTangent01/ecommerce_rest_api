@@ -2,9 +2,9 @@ import assert from "assert";
 import crypto from "crypto";
 import fs from "fs/promises";
 import mongoose from "mongoose";
-import { app, connectDatabase } from "../server.js";
-import { User } from "../models/index.js";
-import { signPayload } from "../utils/webhook.js";
+import { app, connectDatabase } from "../src/server.js";
+import { User } from "../src/models/index.js";
+import { signPayload } from "../src/utils/webhook.js";
 
 const baseEnv = {
   DB_URL: process.env.DB_URL || "mongodb://127.0.0.1:27017/ecommerce_rest_api_validation_runtime",
@@ -84,7 +84,7 @@ try {
     role: "seller",
     tenant,
   });
-  const { JwtService } = await import("../services/index.js");
+  const { JwtService } = await import("../src/services/index.js");
   const adminToken = JwtService.sign({ _id: admin._id, role: "admin" });
   const sellerToken = JwtService.sign({ _id: seller._id, role: "seller" });
 

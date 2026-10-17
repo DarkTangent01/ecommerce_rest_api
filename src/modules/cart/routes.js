@@ -1,6 +1,6 @@
 import { cartController } from "./controller.js";
 import { auth, sensitiveLimiter } from "./policy.js";
-import validateObjectId from "../../../middlewares/validateObjectId.js";
+import validateObjectId from "../../middlewares/validateObjectId.js";
 
 export const registerCartRoutes = (router) => {
   router.get("/cart", auth, cartController.show);

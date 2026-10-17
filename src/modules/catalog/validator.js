@@ -1,1 +1,1 @@
-export { productSchema } from "../../../validators/index.js";
+export { productSchema } from "../../validators/index.js";

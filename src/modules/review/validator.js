@@ -1,1 +1,1 @@
-export { reviewSchema } from "../../../validators/index.js";
+export { reviewSchema } from "../../validators/index.js";

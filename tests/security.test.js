@@ -3,21 +3,21 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { registerSchema, loginSchema, productSchema } from "../validators/index.js";
-import { buildPagination, buildSort } from "../utils/pagination.js";
-import CustomeErrorHandler from "../services/CustomeErrorHandler.js";
-import authorize from "../middlewares/authorize.js";
-import { pickAllowedFields } from "../utils/fieldPolicy.js";
-import { assertPaymentTransition } from "../services/paymentStateMachine.js";
-import { signPayload, verifyWebhookSignature } from "../utils/webhook.js";
-import { assertSafeExternalUrl } from "../utils/ssrf.js";
-import { assertSafeImage } from "../controllers/productsContollers/productContoller.js";
-import { createServiceToken } from "../infra/serviceClient.js";
-import { JwtService } from "../services/index.js";
-import { SERVICE_JWT_SECRET } from "../config/index.js";
-import { createSignedUrl, verifySignedUrl } from "../services/securityService.js";
-import { serviceBoundaryForRoute } from "../architecture/services.js";
-import { withDistributedLock } from "../infra/locks/distributedLock.js";
+import { registerSchema, loginSchema, productSchema } from "../src/validators/index.js";
+import { buildPagination, buildSort } from "../src/utils/pagination.js";
+import CustomeErrorHandler from "../src/services/CustomeErrorHandler.js";
+import authorize from "../src/middlewares/authorize.js";
+import { pickAllowedFields } from "../src/utils/fieldPolicy.js";
+import { assertPaymentTransition } from "../src/services/paymentStateMachine.js";
+import { signPayload, verifyWebhookSignature } from "../src/utils/webhook.js";
+import { assertSafeExternalUrl } from "../src/utils/ssrf.js";
+import { assertSafeImage } from "../src/controllers/productsContollers/productContoller.js";
+import { createServiceToken } from "../src/infra/serviceClient.js";
+import { JwtService } from "../src/services/index.js";
+import { SERVICE_JWT_SECRET } from "../src/config/index.js";
+import { createSignedUrl, verifySignedUrl } from "../src/services/securityService.js";
+import { serviceBoundaryForRoute } from "../src/architecture/services.js";
+import { withDistributedLock } from "../src/infra/locks/distributedLock.js";
 
 const weakRegistration = registerSchema.validate({
   name: "A User",

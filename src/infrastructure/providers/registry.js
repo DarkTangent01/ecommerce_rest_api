@@ -1,1 +1,1 @@
-export * from "../../../plugins/registry.js";
+export * from "../../plugins/registry.js";

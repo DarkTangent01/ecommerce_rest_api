@@ -1,1 +1,1 @@
-export { default } from "../../../services/AuthService.js";
+export { default } from "../../services/AuthService.js";

@@ -1,4 +1,4 @@
-import authorize from "../../../middlewares/authorize.js";
+import authorize from "../../middlewares/authorize.js";
 
 export class ShipmentPolicy {
   static sellerOrAdmin() {

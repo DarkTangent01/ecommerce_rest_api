@@ -1,1 +1,1 @@
-export { default } from "../../../repositories/PaymentRepository.js";
+export { default } from "../../repositories/PaymentRepository.js";

@@ -12,9 +12,9 @@
     "scan:security": "yarn audit && yarn validate && yarn test",
     "load:test": "node scripts/load-test.js",
     "chaos:plan": "node scripts/chaos-check.js",
-    "workers": "node workers/index.js",
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "workers": "node src/workers/index.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
   },
   "keywords": [],
   "author": "MAYANK SRIVASTAVA",

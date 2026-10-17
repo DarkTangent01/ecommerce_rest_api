@@ -1,9 +1,9 @@
 import assert from "assert";
 
-import AuthService from "../services/AuthService.js";
-import CartService from "../services/CartService.js";
-import PaymentService from "../services/PaymentService.js";
-import ProductService from "../services/ProductService.js";
+import AuthService from "../src/services/AuthService.js";
+import CartService from "../src/services/CartService.js";
+import PaymentService from "../src/services/PaymentService.js";
+import ProductService from "../src/services/ProductService.js";
 
 const seller = { _id: "seller-1", role: "seller" };
 

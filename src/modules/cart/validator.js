@@ -1,1 +1,1 @@
-export { cartItemSchema } from "../../../validators/index.js";
+export { cartItemSchema } from "../../validators/index.js";

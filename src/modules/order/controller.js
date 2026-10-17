@@ -1,1 +1,1 @@
-export { default as orderController } from "../../../controllers/orderController.js";
+export { default as orderController } from "../../controllers/orderController.js";

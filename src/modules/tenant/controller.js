@@ -1,1 +1,1 @@
-export { default as tenantController } from "../../../controllers/tenantController.js";
+export { default as tenantController } from "../../controllers/tenantController.js";

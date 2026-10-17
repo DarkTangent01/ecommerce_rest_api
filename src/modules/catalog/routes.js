@@ -1,8 +1,8 @@
 import { productController } from "./controller.js";
 import { CatalogPolicy } from "./policy.js";
-import auth from "../../../middlewares/auth.js";
-import admin from "../../../middlewares/admin.js";
-import validateObjectId from "../../../middlewares/validateObjectId.js";
+import auth from "../../middlewares/auth.js";
+import admin from "../../middlewares/admin.js";
+import validateObjectId from "../../middlewares/validateObjectId.js";
 
 export const registerCatalogRoutes = (router) => {
   router.post("/products", [auth, CatalogPolicy.sellerOrAdmin()], productController.store);

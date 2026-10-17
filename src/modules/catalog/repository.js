@@ -1,1 +1,1 @@
-export { default } from "../../../repositories/ProductRepository.js";
+export { default } from "../../repositories/ProductRepository.js";

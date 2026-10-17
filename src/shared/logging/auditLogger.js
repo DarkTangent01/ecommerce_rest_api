@@ -1,1 +1,1 @@
-export { default } from "../../../utils/auditLogger.js";
+export { default } from "../../utils/auditLogger.js";

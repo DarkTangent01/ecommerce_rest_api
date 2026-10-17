@@ -1,1 +1,1 @@
-export * from "../../../infra/locks/distributedLock.js";
+export * from "../../infra/locks/distributedLock.js";

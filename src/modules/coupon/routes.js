@@ -1,6 +1,6 @@
 import { couponController } from "./controller.js";
 import { admin, adminNetworkPolicy, auth, couponLimiter } from "./policy.js";
-import validateObjectId from "../../../middlewares/validateObjectId.js";
+import validateObjectId from "../../middlewares/validateObjectId.js";
 
 export const registerCouponRoutes = (router) => {
   router.get("/coupons", [auth, admin, adminNetworkPolicy], couponController.index);

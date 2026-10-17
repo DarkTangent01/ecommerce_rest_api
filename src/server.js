@@ -1,5 +1,5 @@
 import express from "express";
-import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT } from "./src/config/index.js";
+import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT } from "./config/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { generalLimiter } from "./middlewares/rateLimiters.js";
-import CustomeErrorHandler from "./src/shared/errors/CustomeErrorHandler.js";
+import CustomeErrorHandler from "./shared/errors/CustomeErrorHandler.js";
 import { requestContext, logEvent } from "./utils/requestContext.js";
 import { rawJsonBody } from "./middlewares/rawBody.js";
 import preventParameterPollution from "./middlewares/preventParameterPollution.js";
@@ -15,14 +15,16 @@ import tenantContext from "./middlewares/tenantContext.js";
 import metricsMiddleware from "./middlewares/metricsMiddleware.js";
 import sanitizeInput from "./middlewares/sanitizeInput.js";
 import sanitizeNoSql from "./middlewares/sanitizeNoSql.js";
-import { connectDatabase, mongoose, registerDatabaseEvents } from "./src/infrastructure/database/mongoose.js";
+import { connectDatabase, mongoose, registerDatabaseEvents } from "./infrastructure/database/mongoose.js";
 
 
 const app = express();
-import routes from "./src/modules/routes.js";
+import routes from "./modules/routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Sources live in src/ (or dist/ once built); logs and uploads stay at the project root.
+const projectRoot = path.resolve(__dirname, "..");
 
 const startServer = async () => {
   try {
@@ -37,12 +39,12 @@ const startServer = async () => {
 };
 registerDatabaseEvents();
 
-global.appRoot = path.resolve(__dirname);
+global.appRoot = projectRoot;
 
 
 // Create a logs directory if it doesn't exist
 
-const logsDirectory = path.join(__dirname, "logs");
+const logsDirectory = path.join(projectRoot, "logs");
 if (!fs.existsSync(logsDirectory)){
   fs.mkdirSync(logsDirectory);
 }

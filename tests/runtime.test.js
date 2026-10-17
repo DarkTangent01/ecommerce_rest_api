@@ -1,5 +1,5 @@
 import assert from "assert";
-import { app } from "../server.js";
+import { app } from "../src/server.js";
 
 const server = app.listen(0);
 const { port } = server.address();

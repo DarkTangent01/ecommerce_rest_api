@@ -1,1 +1,1 @@
-export { default as couponController } from "../../../controllers/couponController.js";
+export { default as couponController } from "../../controllers/couponController.js";

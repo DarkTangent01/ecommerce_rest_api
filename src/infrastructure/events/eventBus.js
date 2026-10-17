@@ -1,1 +1,1 @@
-export * from "../../../infra/events/eventBus.js";
+export * from "../../infra/events/eventBus.js";

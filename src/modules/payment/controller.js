@@ -1,1 +1,1 @@
-export { default as paymentController } from "../../../controllers/paymentController.js";
+export { default as paymentController } from "../../controllers/paymentController.js";

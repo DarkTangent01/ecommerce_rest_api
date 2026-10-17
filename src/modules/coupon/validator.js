@@ -1,1 +1,1 @@
-export { couponSchema } from "../../../validators/index.js";
+export { couponSchema } from "../../validators/index.js";
