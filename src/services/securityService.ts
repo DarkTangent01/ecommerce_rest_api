@@ -1,12 +1,33 @@
 import crypto from "crypto";
+import type { Request } from "express";
+import type { Types } from "mongoose";
 import { ApiKey, SecuritySignal, UserSession } from "../models/index.js";
 import { SIGNED_URL_SECRET, SIGNED_URL_TTL_SECONDS } from "../config/index.js";
+import type { SignalSeverity } from "../models/securitySignal.js";
 
-export const recordSecuritySignal = async ({ type, severity = "info", user, tenant, ip, metadata = {} }) =>
-  SecuritySignal.create({ type, severity, user, tenant, ip, metadata });
+type Id = Types.ObjectId | string;
 
-export const trackSession = async ({ user, refreshToken, req }) => {
-  const deviceId = req.get("X-Device-Id") || crypto.createHash("sha256").update(`${req.get("user-agent") || "unknown"}:${req.ip}`).digest("hex");
+export const recordSecuritySignal = async ({
+  type,
+  severity = "info",
+  user,
+  tenant,
+  ip,
+  metadata = {},
+}: {
+  type: string;
+  severity?: SignalSeverity;
+  user?: Id;
+  tenant?: string;
+  ip?: string;
+  metadata?: Record<string, unknown>;
+}) => SecuritySignal.create({ type, severity, user, tenant, ip, metadata });
+
+export const deviceIdFor = (req: Pick<Request, "get" | "ip">): string =>
+  req.get("X-Device-Id") || crypto.createHash("sha256").update(`${req.get("user-agent") || "unknown"}:${req.ip}`).digest("hex");
+
+export const trackSession = async ({ user, refreshToken, req }: { user: { _id: Id }; refreshToken: Id; req: Request }) => {
+  const deviceId = deviceIdFor(req);
   const recentFailedLogins = await SecuritySignal.countDocuments({
     type: "auth.login_failed",
     ip: req.ip,
@@ -29,9 +50,21 @@ export const trackSession = async ({ user, refreshToken, req }) => {
 };
 
 export const createApiKeyValue = () => `ek_${crypto.randomBytes(32).toString("hex")}`;
-export const hashApiKeyValue = (value) => crypto.createHash("sha256").update(value).digest("hex");
+export const hashApiKeyValue = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
 
-export const createScopedApiKey = async ({ name, tenant, scopes, createdBy, expiresAt }) => {
+export const createScopedApiKey = async ({
+  name,
+  tenant,
+  scopes,
+  createdBy,
+  expiresAt,
+}: {
+  name: string;
+  tenant: string;
+  scopes: string[];
+  createdBy: Id;
+  expiresAt?: Date;
+}) => {
   const key = createApiKeyValue();
   const apiKey = await ApiKey.create({
     name,
@@ -44,14 +77,38 @@ export const createScopedApiKey = async ({ name, tenant, scopes, createdBy, expi
   return { apiKey, key };
 };
 
-export const createSignedUrl = ({ path, tenant, subject, ttlSeconds = SIGNED_URL_TTL_SECONDS }) => {
+export const createSignedUrl = ({
+  path,
+  tenant,
+  subject,
+  ttlSeconds = SIGNED_URL_TTL_SECONDS,
+}: {
+  path: string;
+  tenant: string;
+  subject?: string;
+  ttlSeconds?: number;
+}) => {
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
   const payload = `${path}.${tenant}.${subject || ""}.${expires}`;
   const signature = crypto.createHmac("sha256", SIGNED_URL_SECRET).update(payload).digest("hex");
   return `${path}?tenant=${encodeURIComponent(tenant)}&subject=${encodeURIComponent(subject || "")}&expires=${expires}&signature=${signature}`;
 };
 
-export const verifySignedUrl = ({ path, tenant, subject, expires, signature }) => {
+type MaybeString = string | null | undefined;
+
+export const verifySignedUrl = ({
+  path,
+  tenant,
+  subject,
+  expires,
+  signature,
+}: {
+  path: MaybeString;
+  tenant: MaybeString;
+  subject: MaybeString;
+  expires: MaybeString;
+  signature: MaybeString;
+}): boolean => {
   if (!expires || Number(expires) < Math.floor(Date.now() / 1000)) return false;
   const payload = `${path}.${tenant}.${subject || ""}.${expires}`;
   const expected = crypto.createHmac("sha256", SIGNED_URL_SECRET).update(payload).digest("hex");

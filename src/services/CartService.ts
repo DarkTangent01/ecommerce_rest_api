@@ -1,20 +1,32 @@
+import type { Types } from "mongoose";
 import { CustomeErrorHandler } from "./index.js";
 import CartRepository from "../repositories/CartRepository.js";
 
+type Id = Types.ObjectId | string;
+
+export interface CartItemInput {
+  userId: Id;
+  tenant: string;
+  productId: Id;
+  quantity: number;
+}
+
 class CartService {
+  repository: CartRepository;
+
   constructor(repository = new CartRepository()) {
     this.repository = repository;
   }
 
-  emptyCart(userId) {
+  emptyCart(userId: Id) {
     return { user: userId, items: [] };
   }
 
-  async show(userId, tenant) {
+  async show(userId: Id, tenant: string) {
     return (await this.repository.findForUser(userId, tenant)) || this.emptyCart(userId);
   }
 
-  async addItem({ userId, tenant, productId, quantity }) {
+  async addItem({ userId, tenant, productId, quantity }: CartItemInput) {
     const product = await this.repository.findProduct(productId, tenant);
     if (!product) throw CustomeErrorHandler.notFound("Product not found");
 
@@ -26,11 +38,12 @@ class CartService {
     const cart = existingItem
       ? await this.repository.updateExistingItem(userId, tenant, product._id, requestedQuantity)
       : await this.repository.pushItem(userId, tenant, product._id, quantity);
+    if (!cart) throw CustomeErrorHandler.notFound("Cart item not found");
 
     return this.repository.findById(cart._id);
   }
 
-  async updateItem({ userId, tenant, productId, quantity }) {
+  async updateItem({ userId, tenant, productId, quantity }: CartItemInput) {
     const product = await this.repository.findProduct(productId, tenant);
     if (!product) throw CustomeErrorHandler.notFound("Product not found");
     if (product.stock < quantity) throw CustomeErrorHandler.badRequest("Insufficient stock");
@@ -40,11 +53,11 @@ class CartService {
     return this.repository.findById(cart._id);
   }
 
-  async removeItem({ userId, tenant, productId }) {
+  async removeItem({ userId, tenant, productId }: Omit<CartItemInput, "quantity">) {
     return (await this.repository.removeItem(userId, tenant, productId)) || this.emptyCart(userId);
   }
 
-  async clear(userId, tenant) {
+  async clear(userId: Id, tenant: string) {
     await this.repository.clear(userId, tenant);
     return { items: [] };
   }

@@ -1,10 +1,25 @@
 import bcrypt from "bcrypt";
+import type { Request } from "express";
+import type { Types } from "mongoose";
 import { ACCESS_TOKEN_TTL, BCRYPT_ROUNDS, REFRESH_SECRET, REFRESH_TOKEN_TTL } from "../config/index.js";
 import { CustomeErrorHandler, JwtService } from "./index.js";
 import { recordSecuritySignal, trackSession } from "./securityService.js";
 import AuthRepository from "../repositories/AuthRepository.js";
+import type { Role } from "../types/domain.js";
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface AccessTokenClaims {
+  _id: string;
+  role?: Role;
+}
 
 class AuthService {
+  repository: AuthRepository;
+
   constructor(repository = new AuthRepository()) {
     this.repository = repository;
   }
@@ -14,7 +29,7 @@ class AuthService {
     return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 
-  createTokenPair(user) {
+  createTokenPair(user: { _id: Types.ObjectId; role: Role }): TokenPair {
     const payload = { _id: user._id, role: user.role };
     return {
       access_token: JwtService.sign(payload, ACCESS_TOKEN_TTL),
@@ -22,7 +37,7 @@ class AuthService {
     };
   }
 
-  async register({ name, email, password, tenant, req }) {
+  async register({ name, email, password, tenant, req }: { name: string; email: string; password: string; tenant: string; req: Request }) {
     const exists = await this.repository.userExistsByEmail(email);
     if (exists) {
       throw CustomeErrorHandler.alreadyExist("This email is already taken.");
@@ -46,7 +61,7 @@ class AuthService {
     return tokens;
   }
 
-  async login({ email, password, tenant, ip, req }) {
+  async login({ email, password, tenant, ip, req }: { email: string; password: string; tenant: string; ip?: string; req: Request }) {
     const user = await this.repository.findUserByEmail(email, "+password role email name tenant");
     if (!user) {
       await recordSecuritySignal({ type: "auth.login_failed", severity: "medium", tenant, ip, metadata: { email } });
@@ -78,13 +93,13 @@ class AuthService {
     return { ...tokens, step_up_required: session.stepUpRequired };
   }
 
-  async refresh(refreshTokenValue) {
+  async refresh(refreshTokenValue: string): Promise<TokenPair> {
     const refreshToken = await this.repository.findActiveRefreshToken(refreshTokenValue);
     if (!refreshToken) {
       throw CustomeErrorHandler.unAuthorized("Invalid refresh token");
     }
 
-    const { _id } = JwtService.verify(refreshToken.token, REFRESH_SECRET);
+    const { _id } = JwtService.verify<AccessTokenClaims>(refreshToken.token, REFRESH_SECRET);
     const user = await this.repository.findUserById(_id);
     if (!user) {
       throw CustomeErrorHandler.unAuthorized("No user found!");
@@ -101,7 +116,7 @@ class AuthService {
     return tokens;
   }
 
-  async logout(refreshToken, userId) {
+  async logout(refreshToken: string, userId: Types.ObjectId | string) {
     await this.repository.deleteRefreshTokenForUser(refreshToken, userId);
   }
 }

@@ -35,7 +35,7 @@ describe("ProductService", () => {
   it("throws when the product to update does not exist", async () => {
     const service = new ProductService({ async updateOne() { return null; } } as never);
     await expect(
-      service.update({ id: "missing", value: { name: "Missing" }, user: seller, tenant: "tenant-a" } as never)
+      service.update({ id: "missing", value: { name: "Missing" }, user: seller, tenant: "tenant-a" })
     ).rejects.toThrow(/Product not found/);
   });
 });

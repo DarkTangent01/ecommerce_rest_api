@@ -1,13 +1,21 @@
+import type { ClientSession, Types } from "mongoose";
 import { Coupon, CouponRedemption } from "../models/index.js";
 import { CustomeErrorHandler } from "./index.js";
+import type { Coupon as CouponShape } from "../types/domain.js";
 
-export const calculateDiscount = (coupon, subtotal) => {
+export const calculateDiscount = (coupon: Pick<CouponShape, "type" | "value" | "maxDiscount"> | null | undefined, subtotal: number): number => {
   if (!coupon) return 0;
   const raw = coupon.type === "percentage" ? subtotal * (coupon.value / 100) : coupon.value;
   return Math.min(raw, coupon.maxDiscount || raw, subtotal);
 };
 
-export const validateCouponForUser = async (code, userId, subtotal, session, tenant = "default") => {
+export const validateCouponForUser = async (
+  code: string | undefined,
+  userId: Types.ObjectId | string,
+  subtotal: number,
+  session: ClientSession | null,
+  tenant = "default"
+) => {
   if (!code) return { coupon: null, discount: 0 };
 
   const now = new Date();

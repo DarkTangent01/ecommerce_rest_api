@@ -1,15 +1,23 @@
+import type { FilterQuery, Types } from "mongoose";
 import { CustomeErrorHandler } from "./index.js";
 import ProductRepository from "../repositories/ProductRepository.js";
 import { cache } from "../utils/cache.js";
-import { buildCursorPagination, buildPagination, buildSort, nextCursorFrom } from "../utils/pagination.js";
+import { buildCursorPagination, buildPagination, buildSort, nextCursorFrom, type QueryInput } from "../utils/pagination.js";
 import { pickAllowedFields } from "../utils/fieldPolicy.js";
+import type { AuthUser, Product } from "../types/domain.js";
+
+export type ProductInput = Partial<Pick<Product, "name" | "description" | "price" | "size" | "category" | "sku" | "stock" | "isActive" | "variants">>;
+
+type Actor = Pick<AuthUser, "_id" | "role">;
 
 class ProductService {
+  repository: ProductRepository;
+
   constructor(repository = new ProductRepository()) {
     this.repository = repository;
   }
 
-  async create({ value, filePath, user, tenant }) {
+  async create({ value, filePath, user, tenant }: { value: ProductInput; filePath: string; user: Actor; tenant: string }) {
     const allowedValue = pickAllowedFields("product", user.role, value);
     const document = await this.repository.create({
       ...allowedValue,
@@ -21,9 +29,21 @@ class ProductService {
     return document;
   }
 
-  async update({ id, value, filePath, user, tenant }) {
+  async update({
+    id,
+    value,
+    filePath,
+    user,
+    tenant,
+  }: {
+    id: Types.ObjectId | string;
+    value: ProductInput;
+    filePath?: string;
+    user: Actor;
+    tenant: string;
+  }) {
     const allowedValue = pickAllowedFields("product", user.role, value);
-    const filter = { _id: id, tenant, deletedAt: null };
+    const filter: FilterQuery<Product> = { _id: id, tenant, deletedAt: null };
     if (user.role === "seller") {
       filter.seller = user._id;
     }
@@ -39,7 +59,7 @@ class ProductService {
     return document;
   }
 
-  async delete({ id, tenant }) {
+  async delete({ id, tenant }: { id: Types.ObjectId | string; tenant: string }) {
     const document = await this.repository.softDelete({ _id: id, tenant });
     if (!document) {
       throw CustomeErrorHandler.notFound("Product not found");
@@ -48,30 +68,34 @@ class ProductService {
     return document;
   }
 
-  async list({ query, tenant }) {
+  async list({ query, tenant }: { query: QueryInput; tenant: string }) {
     const cacheKey = `products:${tenant}:${JSON.stringify(query)}`;
-    const cached = await cache.get(cacheKey);
+    const cached = await cache.get<{ data: unknown[]; meta: Record<string, unknown> }>(cacheKey);
     if (cached) return cached;
 
     const useCursor = Boolean(query.cursor);
     const { page, limit, skip } = buildPagination(query);
     const cursorPagination = buildCursorPagination(query);
     const sort = buildSort(query.sortBy, query.order, ["name", "price", "createdAt", "stock"], "-createdAt");
-    const filter = { isActive: true, tenant, deletedAt: null, ...cursorPagination.cursorFilter };
+    const filter: FilterQuery<Product> = { isActive: true, tenant, deletedAt: null, ...cursorPagination.cursorFilter };
 
     if (query.category) {
-      filter.category = query.category;
+      // `category` is the one query key allowed to repeat (see preventParameterPollution).
+      filter.category = query.category as string | string[];
     }
     if (query.minPrice || query.maxPrice) {
       const minPrice = Number(query.minPrice);
       const maxPrice = Number(query.maxPrice);
-      filter.price = {};
-      if (Number.isFinite(minPrice)) filter.price.$gte = minPrice;
-      if (Number.isFinite(maxPrice)) filter.price.$lte = maxPrice;
-      if (Object.keys(filter.price).length === 0) delete filter.price;
+      const price: { $gte?: number; $lte?: number } = {};
+      if (Number.isFinite(minPrice)) price.$gte = minPrice;
+      if (Number.isFinite(maxPrice)) price.$lte = maxPrice;
+      if (Object.keys(price).length > 0) filter.price = price;
     }
-    if (query.q) {
-      const q = String(query.q).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Nested query objects (?q[x]=y) are ignored rather than searched as "[object Object]".
+    if (typeof query.q === "string" && query.q) {
+      const q = query.q
+        .slice(0, 100)
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const search = new RegExp(q, "i");
       filter.$or = [{ name: search }, { description: search }, { category: search }, { sku: search }];
     }
@@ -93,7 +117,7 @@ class ProductService {
     return result;
   }
 
-  async show({ id, tenant }) {
+  async show({ id, tenant }: { id: Types.ObjectId | string; tenant: string }) {
     const document = await this.repository.findByIdForTenant(id, tenant);
     if (!document) {
       throw CustomeErrorHandler.notFound("Product not found");

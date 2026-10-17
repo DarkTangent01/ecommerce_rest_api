@@ -1,8 +1,21 @@
+import type { Request } from "express";
+import type { Types } from "mongoose";
 import { DomainEvent } from "../../models/index.js";
 import { enqueueJob } from "../../utils/queue.js";
 import { logEvent } from "../../utils/requestContext.js";
+import type { DomainEventRecord } from "../../models/domainEvent.js";
 
-export const publishEvent = async ({ type, aggregateType, aggregateId, tenant, payload = {}, req, idempotencyKey }) => {
+export interface PublishEventInput {
+  type: string;
+  aggregateType: string;
+  aggregateId?: Types.ObjectId;
+  tenant?: string;
+  payload?: Record<string, unknown>;
+  req?: Partial<Request> | null;
+  idempotencyKey?: string;
+}
+
+export const publishEvent = async ({ type, aggregateType, aggregateId, tenant, payload = {}, req, idempotencyKey }: PublishEventInput) => {
   const event = await DomainEvent.create({
     type,
     aggregateType,
@@ -19,7 +32,9 @@ export const publishEvent = async ({ type, aggregateType, aggregateId, tenant, p
   return event;
 };
 
-export const consumeEvent = async (event, handlers = {}) => {
+export type EventHandler = (event: Pick<DomainEventRecord, "_id" | "type">) => Promise<unknown>;
+
+export const consumeEvent = async (event: Pick<DomainEventRecord, "_id" | "type">, handlers: Record<string, EventHandler> = {}) => {
   const handler = handlers[event.type];
   if (!handler) return { handled: false };
   await handler(event);

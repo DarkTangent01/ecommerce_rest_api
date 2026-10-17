@@ -1,7 +1,11 @@
+import type { Request } from "express";
 import { SagaInstance } from "../../models/index.js";
 import { publishEvent } from "../events/eventBus.js";
+import type { Order } from "../../types/domain.js";
 
-export const startOrderSaga = async ({ order, tenant, req }) => {
+type SagaOrder = Pick<Order, "_id" | "total" | "user" | "tenant">;
+
+export const startOrderSaga = async ({ order, tenant, req }: { order: SagaOrder; tenant: string; req?: Partial<Request> | null }) => {
   const saga = await SagaInstance.create({
     type: "order_checkout",
     aggregateId: order._id,
@@ -26,7 +30,7 @@ export const startOrderSaga = async ({ order, tenant, req }) => {
   return saga;
 };
 
-export const compensateOrderSaga = async ({ order, reason, req }) => {
+export const compensateOrderSaga = async ({ order, reason, req }: { order: SagaOrder; reason: string; req?: Partial<Request> | null }) => {
   await SagaInstance.updateOne(
     { aggregateId: order._id, type: "order_checkout" },
     {

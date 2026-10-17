@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import type { Request } from "express";
+import type { Types } from "mongoose";
 import { CustomeErrorHandler } from "./index.js";
 import { applyPaymentTransition, assertPaymentTransition } from "./paymentStateMachine.js";
 import PaymentRepository from "../repositories/PaymentRepository.js";
@@ -6,30 +8,46 @@ import { verifyWebhookSignature } from "../utils/webhook.js";
 import auditLogger from "../utils/auditLogger.js";
 import { publishEvent } from "../infra/events/eventBus.js";
 import { emitAlert } from "../observability/metrics.js";
+import type { PaymentStatus } from "../types/domain.js";
+
+export interface WebhookHeaders {
+  signature?: string;
+  timestamp?: string;
+  provider?: string;
+  eventId?: string;
+}
+
+export interface WebhookBody {
+  orderId?: string;
+  type?: string;
+  paymentReference?: string;
+}
 
 class PaymentService {
+  repository: PaymentRepository;
+
   constructor(repository = new PaymentRepository()) {
     this.repository = repository;
   }
 
-  hashPayload(payload) {
+  hashPayload(payload: string) {
     return crypto.createHash("sha256").update(payload).digest("hex");
   }
 
-  targetStateForEvent(type) {
-    const states = {
+  targetStateForEvent(type: string | undefined): PaymentStatus | null {
+    const states: Record<string, PaymentStatus> = {
       "payment.succeeded": "paid",
       "payment.failed": "failed",
       "payment.refunded": "refunded",
     };
-    return states[type] || null;
+    return (type && states[type]) || null;
   }
 
-  verifyWebhook({ rawPayload, signature, timestamp }) {
+  verifyWebhook({ rawPayload, signature, timestamp }: { rawPayload: string; signature?: string; timestamp?: string }) {
     verifyWebhookSignature(rawPayload, signature, timestamp);
   }
 
-  async releaseReservations(orderId) {
+  async releaseReservations(orderId: Types.ObjectId) {
     const reservations = await this.repository.findActiveReservations(orderId);
     for (const reservation of reservations) {
       await this.repository.restoreProductStock(reservation.product, reservation.quantity);
@@ -38,7 +56,7 @@ class PaymentService {
     }
   }
 
-  async processWebhook({ headers, body, rawPayload, req }) {
+  async processWebhook({ headers, body, rawPayload, req }: { headers: WebhookHeaders; body: WebhookBody; rawPayload: string; req: Partial<Request> }) {
     const signature = headers.signature;
     const timestamp = headers.timestamp;
     const provider = headers.provider || "manual";
@@ -52,17 +70,17 @@ class PaymentService {
 
     const existing = await this.repository.findEvent(provider, eventId);
     if (existing) {
-      return { replay: true };
+      return { replay: true as const };
     }
 
     const { orderId, type, paymentReference } = body;
-    const order = await this.repository.findOrderById(orderId);
+    const order = orderId ? await this.repository.findOrderById(orderId) : null;
     if (!order) {
       throw CustomeErrorHandler.notFound("Order not found");
     }
 
     const targetState = this.targetStateForEvent(type);
-    if (!targetState) {
+    if (!targetState || !type) {
       throw CustomeErrorHandler.badRequest("Unsupported payment event");
     }
 
