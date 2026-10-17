@@ -1,26 +1,50 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, input, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 
+/** Read-only star rating with an accessible text equivalent. */
 @Component({
   selector: 'app-rating-stars',
-  imports: [DecimalPipe],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [DecimalPipe, MatIconModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span class="rating-stars" [attr.aria-label]="value() + ' out of 5 stars'">
-      <span>{{ stars() }}</span>
-      <strong>{{ value() | number: '1.1-1' }}</strong>
+    <span class="rating">
+      <span class="stars" aria-hidden="true">
+        @for (star of stars(); track $index) {
+          <mat-icon>{{ star }}</mat-icon>
+        }
+      </span>
+      <span class="visually-hidden">{{ value() | number: '1.1-1' }} out of 5 stars</span>
       @if (count() !== undefined) {
-        <small>({{ count() }})</small>
+        <span class="count">({{ count() }})</span>
       }
     </span>
   `,
+  styles: `
+    .rating {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font: var(--mat-sys-body-small);
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .stars {
+      display: inline-flex;
+      color: #b8860b;
+    }
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  `,
 })
 export class RatingStarsComponent {
-  value = input(0);
-  count = input<number | undefined>(undefined);
+  readonly value = input(0);
+  readonly count = input<number | undefined>(undefined);
 
-  stars(): string {
-    const rounded = Math.max(0, Math.min(5, Math.round(this.value())));
-    return `${'★'.repeat(rounded)}${'☆'.repeat(5 - rounded)}`;
-  }
+  readonly stars = computed(() => {
+    const rounded = Math.round(Math.max(0, Math.min(5, this.value())) * 2) / 2;
+    return Array.from({ length: 5 }, (_, i) => (rounded >= i + 1 ? 'star' : rounded >= i + 0.5 ? 'star_half' : 'star_border'));
+  });
 }

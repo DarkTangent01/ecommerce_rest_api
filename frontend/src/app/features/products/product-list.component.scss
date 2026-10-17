@@ -1,0 +1,41 @@
+.filters {
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 24px;
+  padding: 16px 16px 4px;
+
+  .search {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 960px) {
+    grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr auto;
+
+    .search {
+      grid-column: auto;
+    }
+  }
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding-top: 8px;
+  grid-column: 1 / -1;
+
+  @media (min-width: 960px) {
+    grid-column: auto;
+  }
+}
+
+.reloading {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+mat-paginator {
+  margin-top: 16px;
+  background: transparent;
+}

@@ -1,0 +1,142 @@
+<div class="page">
+  <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading product" (retry)="product.reload()">
+    @if (product.value(); as item) {
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a routerLink="/products">Products</a>
+        @if (item.category) {
+          <span aria-hidden="true">/</span>
+          <a routerLink="/products" [queryParams]="{ category: item.category }">{{ item.category }}</a>
+        }
+      </nav>
+
+      <article class="product">
+        <div class="gallery">
+          <img [src]="item.image" [alt]="item.name" width="640" height="640" />
+        </div>
+
+        <section class="buy-box" aria-labelledby="product-name">
+          <h1 id="product-name">{{ item.name }}</h1>
+          @if (item.ratingCount > 0) {
+            <app-rating-stars [value]="item.ratingAverage" [count]="item.ratingCount" />
+          }
+          <p class="price">{{ item.price | money }}</p>
+          <app-stock-badge [stock]="item.stock" />
+          @if (!item.isActive) {
+            <p class="muted">This product is currently not available for purchase.</p>
+          }
+
+          @if (item.stock > 0 && item.isActive) {
+            <div class="purchase">
+              <mat-form-field class="qty">
+                <mat-label>Quantity</mat-label>
+                <mat-select [value]="quantity()" (valueChange)="quantity.set($event)">
+                  @for (n of quantityOptions(); track n) {
+                    <mat-option [value]="n">{{ n }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button mat-flat-button type="button" class="add" [disabled]="adding()" (click)="addToCart()">
+                <mat-icon>add_shopping_cart</mat-icon>
+                {{ auth.isAuthenticated() ? 'Add to cart' : 'Sign in to buy' }}
+              </button>
+            </div>
+          }
+
+          <button mat-stroked-button type="button" (click)="toggleWishlist()" [attr.aria-pressed]="wishlist.has(item._id)">
+            <mat-icon>{{ wishlist.has(item._id) ? 'favorite' : 'favorite_border' }}</mat-icon>
+            {{ wishlist.has(item._id) ? 'Saved to wishlist' : 'Save to wishlist' }}
+          </button>
+
+          @if (item.description) {
+            <h2 class="section-title">About this product</h2>
+            <p class="description">{{ item.description }}</p>
+          }
+
+          @if (item.variants.length) {
+            <h2 class="section-title">Available variants</h2>
+            <ul class="variants">
+              @for (variant of item.variants; track variant._id ?? $index) {
+                <li>
+                  {{ variantLabel(variant) }}
+                  @if (variant.price !== undefined) {
+                    · {{ variant.price | money }}
+                  }
+                </li>
+              }
+            </ul>
+            <p class="muted small">Variant selection is not supported at checkout yet.</p>
+          }
+        </section>
+      </article>
+
+      <section class="reviews" aria-labelledby="reviews-title">
+        <h2 id="reviews-title">Customer reviews</h2>
+        <div class="reviews-layout">
+          <div>
+            <app-async-state [state]="reviewsState()" (retry)="reviews.reload()" loadingLabel="Loading reviews">
+              @if (reviews.value()?.items?.length) {
+                <ul class="review-list">
+                  @for (review of reviews.value()!.items; track review._id) {
+                    <li class="review">
+                      <app-rating-stars [value]="review.rating" />
+                      @if (review.title) {
+                        <h3>{{ review.title }}</h3>
+                      }
+                      @if (review.comment) {
+                        <p>{{ review.comment }}</p>
+                      }
+                      <p class="muted small">{{ reviewerName(review) }} · {{ review.createdAt | date: 'mediumDate' }}</p>
+                    </li>
+                  }
+                </ul>
+                @if (reviews.value()!.meta.pages > 1) {
+                  <mat-paginator
+                    [length]="reviews.value()!.meta.total"
+                    [pageIndex]="reviewPage() - 1"
+                    [pageSize]="reviewsPageSize"
+                    [hidePageSize]="true"
+                    (page)="changeReviewPage($event)"
+                    aria-label="Choose reviews page"
+                  />
+                }
+              } @else {
+                <app-empty-state icon="rate_review" title="No reviews yet" description="Reviews come from customers who bought this product." />
+              }
+            </app-async-state>
+          </div>
+
+          <div class="review-form surface">
+            <h3>Write a review</h3>
+            @if (auth.isAuthenticated()) {
+              <form [formGroup]="reviewForm" (ngSubmit)="submitReview()">
+                <mat-form-field>
+                  <mat-label>Rating</mat-label>
+                  <mat-select formControlName="rating">
+                    @for (n of [5, 4, 3, 2, 1]; track n) {
+                      <mat-option [value]="n">{{ n }} {{ n === 1 ? 'star' : 'stars' }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Title (optional)</mat-label>
+                  <input matInput formControlName="title" [maxlength]="rules.review.title" />
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Your review (optional)</mat-label>
+                  <textarea matInput formControlName="comment" rows="4" [maxlength]="rules.review.comment"></textarea>
+                  <mat-hint align="end">{{ reviewForm.controls.comment.value.length }} / {{ rules.review.comment }}</mat-hint>
+                </mat-form-field>
+                @if (reviewError(); as message) {
+                  <p class="form-error" role="alert">{{ message }}</p>
+                }
+                <button mat-flat-button type="submit" [disabled]="submittingReview()">Submit review</button>
+              </form>
+            } @else {
+              <p class="muted"><a routerLink="/login" [queryParams]="{ returnUrl: '/products/' + item._id }">Sign in</a> to review a product you bought.</p>
+            }
+          </div>
+        </div>
+      </section>
+    }
+  </app-async-state>
+</div>

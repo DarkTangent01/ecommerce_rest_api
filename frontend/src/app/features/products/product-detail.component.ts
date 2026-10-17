@@ -1,277 +1,153 @@
-import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import {
-  CartApiService,
-  ProductApiService,
-  ReviewApiService,
-  WishlistApiService,
-} from '../../core/api/domain-api.services';
-import { CartStateService } from '../../core/cart/cart-state.service';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
+import { MatSelectModule } from '@angular/material/select';
+import { RouterLink } from '@angular/router';
+import { ProductsApi } from '../../core/api/products.api';
+import { ReviewsApi } from '../../core/api/catalog-extras.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { CartActions } from '../../core/cart/cart-actions.service';
+import { RULES } from '../../core/config/validation';
+import { ApiError } from '../../core/http/api-error';
+import type { ProductVariant, Review } from '../../core/models';
+import { AppTitleStrategy } from '../../core/routing/title.strategy';
+import { WishlistStore } from '../../core/wishlist/wishlist.store';
+import { AsyncStateComponent } from '../../shared/components/async-state.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
-import { ProductCardComponent } from '../../shared/components/product-card.component';
 import { RatingStarsComponent } from '../../shared/components/rating-stars.component';
+import { StockBadgeComponent } from '../../shared/components/stock-badge.component';
 import { ToastService } from '../../shared/components/toast.service';
-import { Product, Review } from '../../shared/models/api.models';
+import { errorMessage } from '../../shared/forms/form-errors';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { errorMessageOf, viewStateOf } from '../../shared/resource-state';
+
+const REVIEWS_PAGE_SIZE = 5;
 
 @Component({
   selector: 'app-product-detail',
   imports: [
-    CurrencyPipe,
+    DatePipe,
     ReactiveFormsModule,
+    RouterLink,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatPaginatorModule,
+    MatSelectModule,
+    AsyncStateComponent,
     EmptyStateComponent,
     RatingStarsComponent,
-    ProductCardComponent,
+    StockBadgeComponent,
+    MoneyPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    @if (product(); as item) {
-      <section class="product-detail">
-        <div class="gallery">
-          <div class="thumb-list">
-            <button class="thumb active" type="button">
-              <img [src]="item.image" [alt]="item.name" />
-            </button>
-            @for (variant of item.variants || []; track variant.sku) {
-              <button class="thumb" type="button">
-                {{ variant.color || variant.size || 'SKU' }}
-              </button>
-            }
-          </div>
-          <div class="main-image">
-            <img [src]="item.image" [alt]="item.name" />
-            <span class="product-badge" [class.out]="item.stock <= 0">{{ badge(item) }}</span>
-          </div>
-        </div>
-
-        <div class="buy-box">
-          <p class="shop-card-category">{{ item.category || 'Essentials' }}</p>
-          <h1>{{ item.name }}</h1>
-          <app-rating-stars [value]="item.ratingAverage || 0" [count]="item.ratingCount || 0" />
-          <p class="detail-copy">
-            {{
-              item.description || 'A carefully selected catalog item ready for your ecommerce flow.'
-            }}
-          </p>
-
-          <div class="detail-price">
-            <strong>{{ item.price | currency: 'USD' }}</strong>
-            <span>{{ listPrice(item) | currency: 'USD' }}</span>
-            <em>{{ discount(item) }}% off</em>
-          </div>
-
-          <div class="stock-line" [class.out]="item.stock <= 0">
-            {{ item.stock > 0 ? item.stock + ' in stock' : 'Out of stock' }}
-          </div>
-
-          <form [formGroup]="cartForm" class="purchase-panel">
-            <label>Quantity <input type="number" min="1" formControlName="quantity" /></label>
-            <div class="purchase-actions">
-              <button
-                class="button primary"
-                type="button"
-                [disabled]="item.stock <= 0"
-                (click)="addToCart()"
-              >
-                Add to cart
-              </button>
-              <button
-                class="button buy-now"
-                type="button"
-                [disabled]="item.stock <= 0"
-                (click)="buyNow()"
-              >
-                Buy now
-              </button>
-              <button class="button ghost" type="button" (click)="save()">Wishlist</button>
-            </div>
-          </form>
-
-          <div class="delivery-card">
-            <strong>Delivery and buyer protection</strong>
-            <span
-              >Secure order creation, stock reservation, coupon support, and order tracking are
-              handled by the backend.</span
-            >
-          </div>
-        </div>
-      </section>
-
-      <section class="section split product-info-split">
-        <article class="panel">
-          <h2>Customer reviews</h2>
-          <div class="review-list">
-            @for (review of reviews(); track review._id) {
-              <article class="review-card compact">
-                <app-rating-stars [value]="review.rating" />
-                <strong>{{ review.title || 'Verified review' }}</strong>
-                <p>{{ review.comment || 'No comment added.' }}</p>
-                <small>{{ review.user?.name || 'Verified customer' }}</small>
-              </article>
-            } @empty {
-              <app-empty-state
-                title="No reviews yet"
-                description="Reviews require a verified purchase in the backend."
-                icon="0"
-              />
-            }
-          </div>
-        </article>
-
-        <form class="form-card" [formGroup]="reviewForm" (ngSubmit)="submitReview()">
-          <h2>Add a review</h2>
-          <label
-            >Rating
-            <select formControlName="rating">
-              <option [value]="5">5 stars</option>
-              <option [value]="4">4 stars</option>
-              <option [value]="3">3 stars</option>
-              <option [value]="2">2 stars</option>
-              <option [value]="1">1 star</option>
-            </select>
-          </label>
-          <label>Title <input formControlName="title" placeholder="Great quality" /></label>
-          <label
-            >Comment
-            <textarea
-              formControlName="comment"
-              placeholder="Share your product experience"
-            ></textarea>
-          </label>
-          <button class="button primary wide" type="submit" [disabled]="reviewForm.invalid">
-            Submit review
-          </button>
-          <p class="muted">The API accepts reviews only from verified purchasers.</p>
-        </form>
-      </section>
-
-      <section class="section">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Related products</p>
-            <h2>More picks from this category</h2>
-          </div>
-        </div>
-        <div class="product-grid">
-          @for (related of relatedProducts(); track related._id) {
-            <app-product-card
-              [product]="related"
-              (addToCart)="addToCartProduct($event)"
-              (save)="saveProduct($event)"
-            />
-          }
-        </div>
-      </section>
-    }
-  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './product-detail.component.html',
+  styleUrl: './product-detail.component.scss',
 })
 export class ProductDetailComponent {
-  private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
-  private readonly productsApi = inject(ProductApiService);
-  private readonly cartApi = inject(CartApiService);
-  private readonly cartState = inject(CartStateService);
-  private readonly wishlistApi = inject(WishlistApiService);
-  private readonly reviewsApi = inject(ReviewApiService);
+  private readonly productsApi = inject(ProductsApi);
+  private readonly reviewsApi = inject(ReviewsApi);
+  private readonly cartActions = inject(CartActions);
+  private readonly titles = inject(AppTitleStrategy);
   private readonly toast = inject(ToastService);
-  private readonly fb = inject(FormBuilder);
-  readonly product = signal<Product | null>(null);
-  readonly relatedProducts = signal<Product[]>([]);
-  readonly reviews = signal<Review[]>([]);
-  readonly cartForm = this.fb.nonNullable.group({
-    quantity: [1, [Validators.required, Validators.min(1)]],
+  private readonly fb = inject(NonNullableFormBuilder);
+  readonly auth = inject(AuthService);
+  readonly wishlist = inject(WishlistStore);
+
+  /** Route parameter, bound by withComponentInputBinding(). */
+  readonly id = input.required<string>();
+
+  readonly product = rxResource({ params: () => this.id(), stream: ({ params }) => this.productsApi.get(params) });
+  readonly state = computed(() => viewStateOf(this.product));
+  readonly error = computed(() => errorMessageOf(this.product));
+
+  readonly reviewPage = signal(1);
+  readonly reviews = rxResource({
+    params: () => ({ id: this.id(), page: this.reviewPage() }),
+    stream: ({ params }) => this.reviewsApi.list(params.id, { page: params.page, limit: REVIEWS_PAGE_SIZE }),
   });
-  readonly reviewForm = this.fb.nonNullable.group({
+  readonly reviewsState = computed(() => viewStateOf(this.reviews));
+  readonly reviewsPageSize = REVIEWS_PAGE_SIZE;
+
+  readonly quantity = signal(1);
+  /** Quantity choices: 1..stock, capped at the cart's 10-per-click convenience (the API allows up to 999). */
+  readonly quantityOptions = computed(() => {
+    const stock = this.product.value()?.stock ?? 0;
+    return Array.from({ length: Math.min(stock, 10) }, (_, i) => i + 1);
+  });
+  readonly adding = signal(false);
+
+  readonly reviewForm = this.fb.group({
     rating: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
-    title: [''],
-    comment: [''],
+    title: ['', Validators.maxLength(RULES.review.title)],
+    comment: ['', Validators.maxLength(RULES.review.comment)],
   });
+  readonly submittingReview = signal(false);
+  readonly reviewError = signal<string | null>(null);
+  readonly rules = RULES;
+  readonly errorMessage = errorMessage;
 
   constructor() {
-    const id = this.route.snapshot.paramMap.get('id') ?? '';
-    this.productsApi.get(id).subscribe((product) => {
-      this.product.set(product);
-      this.productsApi
-        .list({ category: product.category || '', limit: 4 })
-        .subscribe({
-          next: (res) => this.relatedProducts.set(res.data.filter((item) => item._id !== id)),
-          error: () => undefined,
-        });
+    effect(() => {
+      const product = this.product.value();
+      if (product) this.titles.setPageTitle(product.name);
     });
-    this.reviewsApi
-      .list(id)
-      .subscribe({
-        next: (reviews) => this.reviews.set(reviews),
-        error: () => this.reviews.set([]),
-      });
   }
 
-  discount(product: Product): number {
-    return product.stock <= 0 ? 0 : 15 + (product.name.length % 20);
+  variantLabel(variant: ProductVariant): string {
+    return [variant.size, variant.color].filter((part): part is string => Boolean(part)).join(' / ') || variant.sku || 'Variant';
   }
 
-  listPrice(product: Product): number {
-    return Math.round(product.price / (1 - this.discount(product) / 100));
-  }
-
-  badge(product: Product): string {
-    if (product.stock <= 0) return 'OUT OF STOCK';
-    if ((product.ratingAverage || 0) >= 4.5) return 'BESTSELLER';
-    return 'SALE';
+  reviewerName(review: Review): string {
+    return typeof review.user === 'object' ? review.user.name : 'Verified buyer';
   }
 
   addToCart(): void {
-    const item = this.product();
-    if (!item || this.cartForm.invalid) return;
-    this.addToCartProduct(item, this.cartForm.getRawValue().quantity);
-  }
-
-  buyNow(): void {
-    const item = this.product();
-    if (!item) return;
-    this.addToCartProduct(
-      item,
-      this.cartForm.getRawValue().quantity,
-      () => void this.router.navigateByUrl('/checkout'),
-    );
-  }
-
-  addToCartProduct(product: Product, quantity = 1, after?: () => void): void {
-    this.cartApi.add(product._id, quantity).subscribe({
-      next: (cart) => {
-        this.cartState.set(cart);
-        this.toast.show('Added to cart', 'success');
-        after?.();
-      },
-      error: (err) =>
-        this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
+    const product = this.product.value();
+    if (!product) return;
+    this.adding.set(true);
+    this.cartActions.add(product._id, this.quantity()).subscribe({
+      complete: () => this.adding.set(false),
     });
   }
 
-  save(): void {
-    const item = this.product();
-    if (item) this.saveProduct(item);
+  toggleWishlist(): void {
+    const product = this.product.value();
+    if (product) this.wishlist.toggle(product._id).subscribe();
   }
 
-  saveProduct(product: Product): void {
-    this.wishlistApi.add(product._id).subscribe({
-      next: () => this.toast.show('Saved to wishlist', 'success'),
-      error: (err) => this.toast.show(err.error?.message ?? 'Could not save item', 'error'),
-    });
+  changeReviewPage(event: PageEvent): void {
+    this.reviewPage.set(event.pageIndex + 1);
   }
 
   submitReview(): void {
-    const item = this.product();
-    if (!item || this.reviewForm.invalid) return;
-    this.reviewsApi.create(item._id, this.reviewForm.getRawValue()).subscribe({
-      next: (review) => {
-        this.reviews.update((reviews) => [review, ...reviews]);
+    const product = this.product.value();
+    if (!product || this.reviewForm.invalid || this.submittingReview()) return;
+    const { rating, title, comment } = this.reviewForm.getRawValue();
+    this.submittingReview.set(true);
+    this.reviewError.set(null);
+    this.reviewsApi.create(product._id, { rating, ...(title.trim() && { title: title.trim() }), ...(comment.trim() && { comment: comment.trim() }) }).subscribe({
+      next: () => {
+        this.submittingReview.set(false);
+        this.toast.show('Thanks! Your review is published.', 'success');
         this.reviewForm.reset({ rating: 5, title: '', comment: '' });
-        this.toast.show('Review saved', 'success');
+        this.reviewPage.set(1);
+        this.reviews.reload();
+        // The backend recalculates the product's rating after a review is saved.
+        this.product.reload();
       },
-      error: (err) =>
-        this.toast.show(err.error?.message ?? 'Review requires a verified purchase', 'error'),
+      error: (error: unknown) => {
+        this.submittingReview.set(false);
+        const apiError = ApiError.from(error);
+        this.reviewError.set(apiError.status === 403 ? 'Only customers who bought this product can review it.' : apiError.message);
+      },
     });
   }
 }
