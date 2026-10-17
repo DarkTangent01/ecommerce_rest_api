@@ -1,78 +1,64 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { CartStateService } from '../../core/cart/cart-state.service';
+import { RULES } from '../../core/config/validation';
+import { ApiError } from '../../core/http/api-error';
 import { ToastService } from '../../shared/components/toast.service';
+import { errorMessage } from '../../shared/forms/form-errors';
+import { safeReturnUrl } from '../../shared/forms/validators';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="auth-page">
-      <div class="auth-panel">
-        <p class="eyebrow">Welcome back</p>
-        <h1>Sign in to continue shopping.</h1>
-        <p class="muted">
-          Access your cart, wishlist, order history, and role-aware seller/admin tools.
-        </p>
-        <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-          <label
-            >Email
-            <input formControlName="email" type="email" autocomplete="email" />
-            @if (form.controls.email.touched && form.controls.email.invalid) {
-              <small class="field-error">Enter a valid email.</small>
-            }
-          </label>
-          <label
-            >Password
-            <span class="password-wrap">
-              <input
-                formControlName="password"
-                [type]="showPassword() ? 'text' : 'password'"
-                autocomplete="current-password"
-              />
-              <button type="button" (click)="showPassword.set(!showPassword())">
-                {{ showPassword() ? 'Hide' : 'Show' }}
-              </button>
-            </span>
-          </label>
-          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">
-            {{ loading ? 'Signing in...' : 'Log in' }}
-          </button>
-        </form>
-        <p class="muted">New here? <a routerLink="/register">Create an account</a></p>
-      </div>
-    </section>
-  `,
+  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './login.component.html',
+  styleUrl: './auth-page.scss',
 })
 export class LoginComponent {
-  private readonly fb = inject(FormBuilder);
+  private readonly fb = inject(NonNullableFormBuilder);
   private readonly auth = inject(AuthService);
-  private readonly cartState = inject(CartStateService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+
+  /** Bound from the query string by withComponentInputBinding(). */
+  readonly returnUrl = input<string>();
+  readonly reason = input<string>();
+
+  readonly submitting = signal(false);
+  readonly formError = signal<string | null>(null);
   readonly showPassword = signal(false);
-  loading = false;
-  readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', Validators.required],
+  readonly errorMessage = errorMessage;
+
+  readonly form = this.fb.group({
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(RULES.email.max)]],
+    password: ['', [Validators.required, Validators.maxLength(RULES.loginPassword.max)]],
   });
 
   submit(): void {
-    if (this.form.invalid) return;
-    this.loading = true;
+    this.form.markAllAsTouched();
+    if (this.form.invalid || this.submitting()) return;
+
+    this.submitting.set(true);
+    this.formError.set(null);
     this.auth.login(this.form.getRawValue()).subscribe({
-      next: () => {
-        this.auth.loadProfile().subscribe();
-        this.cartState.load();
-        this.toast.show('Logged in successfully', 'success');
-        void this.router.navigateByUrl('/products');
+      next: (user) => {
+        this.toast.show(`Welcome back, ${user.name}.`, 'success');
+        if (this.auth.stepUpRequired()) {
+          this.toast.show('We noticed unusual sign-in activity. Some actions such as checkout are blocked for this session.', 'info');
+        }
+        void this.router.navigateByUrl(safeReturnUrl(this.returnUrl()));
       },
-      error: (err) => {
-        this.loading = false;
-        this.toast.show(err.error?.message ?? 'Login failed', 'error');
+      error: (error: unknown) => {
+        this.submitting.set(false);
+        const apiError = ApiError.from(error);
+        // Same message for unknown email and wrong password, as the backend intends.
+        this.formError.set(apiError.status === 401 ? 'Email or password is incorrect.' : apiError.message);
       },
     });
   }

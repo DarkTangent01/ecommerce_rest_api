@@ -238,9 +238,8 @@ svg {
   color: var(--muted);
 }
 
-input,
-select,
-textarea {
+// Scoped so these legacy element styles never reach Material fields or the new shell.
+:is(input, select, textarea):not(.mat-mdc-form-field *):not(.search *) {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -250,13 +249,13 @@ textarea {
   color: var(--ink);
 }
 
-textarea {
+textarea:not(.mat-mdc-form-field *) {
   min-height: 112px;
   padding-top: 12px;
   resize: vertical;
 }
 
-label {
+label:not(.mat-mdc-form-field *):not(.search *) {
   display: grid;
   gap: 7px;
   color: #344054;

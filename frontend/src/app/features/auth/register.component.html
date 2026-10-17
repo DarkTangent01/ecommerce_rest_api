@@ -1,0 +1,72 @@
+<section class="signin-page">
+  <mat-card class="auth-card" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title><h1>Create your account</h1></mat-card-title>
+      <mat-card-subtitle>Save your cart, check out faster and track orders.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (formError(); as message) {
+        <p class="notice error" role="alert"><mat-icon aria-hidden="true">error</mat-icon> {{ message }}</p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field>
+          <mat-label>Full name</mat-label>
+          <input matInput formControlName="name" autocomplete="name" [maxlength]="rules.name.max" required />
+          @if (form.controls.name.invalid) {
+            <mat-error>{{ errorMessage(form.controls.name, 'Name') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Email</mat-label>
+          <input matInput formControlName="email" type="email" autocomplete="email" inputmode="email" required />
+          @if (form.controls.email.invalid) {
+            <mat-error>{{ errorMessage(form.controls.email, 'Email') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            formControlName="password"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="new-password"
+            [maxlength]="rules.password.max"
+            aria-describedby="password-hint"
+            required
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="showPassword.set(!showPassword())"
+            [attr.aria-label]="showPassword() ? 'Hide passwords' : 'Show passwords'"
+            [attr.aria-pressed]="showPassword()"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint id="password-hint">{{ rules.password.min }}–{{ rules.password.max }} characters with upper and lower case letters and a number.</mat-hint>
+          @if (form.controls.password.invalid) {
+            <mat-error>{{ errorMessage(form.controls.password, 'Password') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Repeat password</mat-label>
+          <input matInput formControlName="repeat_password" [type]="showPassword() ? 'text' : 'password'" autocomplete="new-password" required />
+          @if (form.controls.repeat_password.invalid) {
+            <mat-error>{{ errorMessage(form.controls.repeat_password, 'Repeat password') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <button mat-flat-button class="submit" type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Creating account…' : 'Create account' }}
+        </button>
+      </form>
+
+      <p class="switch muted">Already registered? <a routerLink="/login" [queryParams]="{ returnUrl: returnUrl() }">Sign in</a></p>
+    </mat-card-content>
+  </mat-card>
+</section>

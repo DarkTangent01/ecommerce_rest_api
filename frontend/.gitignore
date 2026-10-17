@@ -54,3 +54,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Seed output of e2e/support/backend.mjs (throwaway local test accounts)
+/e2e/.seed.json

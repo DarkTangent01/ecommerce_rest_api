@@ -1,0 +1,46 @@
+.signin-page {
+  display: grid;
+  place-items: center;
+  padding: 32px 16px 64px;
+}
+
+.auth-card {
+  width: min(440px, 100%);
+  padding: 8px;
+}
+
+form {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.submit {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.notice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+
+  &.error {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+  }
+}
+
+.switch {
+  margin: 16px 0 0;
+  text-align: center;
+}

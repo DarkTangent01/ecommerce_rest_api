@@ -1,87 +1,69 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { CartStateService } from '../../core/cart/cart-state.service';
+import { RULES } from '../../core/config/validation';
+import { ApiError } from '../../core/http/api-error';
 import { ToastService } from '../../shared/components/toast.service';
+import { applyServerErrors, errorMessage } from '../../shared/forms/form-errors';
+import { matchFields, notBlank, passwordStrength, safeReturnUrl } from '../../shared/forms/validators';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="auth-page">
-      <div class="auth-panel">
-        <p class="eyebrow">Create account</p>
-        <h1>Create your shopping profile.</h1>
-        <p class="muted">Save products, checkout faster, and track your orders across sessions.</p>
-        <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-          <label>Name <input formControlName="name" autocomplete="name" /></label>
-          <label>Email <input formControlName="email" type="email" autocomplete="email" /></label>
-          <label
-            >Password
-            <span class="password-wrap">
-              <input
-                formControlName="password"
-                [type]="showPassword() ? 'text' : 'password'"
-                autocomplete="new-password"
-              />
-              <button type="button" (click)="showPassword.set(!showPassword())">
-                {{ showPassword() ? 'Hide' : 'Show' }}
-              </button>
-            </span>
-            <small>Password must include uppercase, lowercase, and a number.</small>
-          </label>
-          <label
-            >Repeat password
-            <input
-              formControlName="repeat_password"
-              [type]="showPassword() ? 'text' : 'password'"
-              autocomplete="new-password"
-          /></label>
-          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">
-            {{ loading ? 'Creating...' : 'Register' }}
-          </button>
-        </form>
-        <p class="muted">Already have an account? <a routerLink="/login">Log in</a></p>
-      </div>
-    </section>
-  `,
+  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './register.component.html',
+  styleUrl: './auth-page.scss',
 })
 export class RegisterComponent {
-  private readonly fb = inject(FormBuilder);
+  private readonly fb = inject(NonNullableFormBuilder);
   private readonly auth = inject(AuthService);
-  private readonly cartState = inject(CartStateService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+
+  readonly returnUrl = input<string>();
+  readonly submitting = signal(false);
+  readonly formError = signal<string | null>(null);
   readonly showPassword = signal(false);
-  loading = false;
-  readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.minLength(2)]],
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
-    repeat_password: ['', Validators.required],
-  });
+  readonly errorMessage = errorMessage;
+  readonly rules = RULES;
+
+  readonly form = this.fb.group(
+    {
+      name: ['', [Validators.required, notBlank, Validators.minLength(RULES.name.min), Validators.maxLength(RULES.name.max)]],
+      email: ['', [Validators.required, Validators.email, Validators.maxLength(RULES.email.max)]],
+      password: ['', [Validators.required, Validators.minLength(RULES.password.min), Validators.maxLength(RULES.password.max), passwordStrength]],
+      repeat_password: ['', Validators.required],
+    },
+    { validators: matchFields('password', 'repeat_password', 'Passwords do not match.') },
+  );
 
   submit(): void {
-    if (this.form.invalid || this.form.value.password !== this.form.value.repeat_password) {
-      this.toast.show(
-        'Passwords must match and include uppercase, lowercase, and a number.',
-        'error',
-      );
-      return;
-    }
-    this.loading = true;
-    this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => {
-        this.auth.loadProfile().subscribe();
-        this.cartState.load();
-        this.toast.show('Account created', 'success');
-        void this.router.navigateByUrl('/products');
+    this.form.markAllAsTouched();
+    if (this.form.invalid || this.submitting()) return;
+
+    this.submitting.set(true);
+    this.formError.set(null);
+    const value = this.form.getRawValue();
+    this.auth.register({ ...value, name: value.name.trim() }).subscribe({
+      next: (user) => {
+        this.toast.show(`Welcome, ${user.name}! Your account is ready.`, 'success');
+        void this.router.navigateByUrl(safeReturnUrl(this.returnUrl()));
       },
-      error: (err) => {
-        this.loading = false;
-        this.toast.show(err.error?.message ?? 'Registration failed', 'error');
+      error: (error: unknown) => {
+        this.submitting.set(false);
+        const apiError = ApiError.from(error);
+        if (apiError.status === 409) {
+          this.form.controls.email.setErrors({ server: 'An account with this email already exists.' });
+          return;
+        }
+        const unmatched = applyServerErrors(this.form, apiError);
+        this.formError.set(unmatched.length || !apiError.fieldErrors.length ? apiError.message : null);
       },
     });
   }
