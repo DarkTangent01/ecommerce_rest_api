@@ -1,11 +1,13 @@
+import type { NextFunction, Request, Response } from "express";
 import { Order, Product, Review } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
 import { reviewSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import mongoose from "mongoose";
+import { assertAuthed } from "../types/http.js";
 
-const recalculateRating = async (productId) => {
-  const stats = await Review.aggregate([
+const recalculateRating = async (productId: string) => {
+  const stats = await Review.aggregate<{ average: number; count: number }>([
     { $match: { product: new mongoose.Types.ObjectId(productId), status: "published" } },
     { $group: { _id: "$product", average: { $avg: "$rating" }, count: { $sum: 1 } } },
   ]);
@@ -19,7 +21,7 @@ class ReviewController {
     this.create = this.create.bind(this);
   }
 
-  async index(req, res, next) {
+  async index(req: Request<{ productId: string }>, res: Response, next: NextFunction) {
     try {
       const reviews = await Review.find({ product: req.params.productId, tenant: req.tenant, status: "published" })
         .sort("-createdAt")
@@ -30,11 +32,12 @@ class ReviewController {
     }
   }
 
-  async create(req, res, next) {
+  async create(req: Request<{ productId: string }>, res: Response, next: NextFunction) {
     const { error, value } = validate(reviewSchema, req.body);
     if (error) return next(error);
 
     try {
+      assertAuthed(req);
       const product = await Product.exists({ _id: req.params.productId, tenant: req.tenant, isActive: true, deletedAt: null });
       if (!product) return next(CustomeErrorHandler.notFound("Product not found"));
 
@@ -54,7 +57,7 @@ class ReviewController {
       await recalculateRating(req.params.productId);
       return successResponse(res, review, "Review saved", 201);
     } catch (err) {
-      if (err.code === 11000) return next(CustomeErrorHandler.badRequest("Review already exists"));
+      if ((err as { code?: number }).code === 11000) return next(CustomeErrorHandler.badRequest("Review already exists"));
       return next(err);
     }
   }

@@ -1,3 +1,5 @@
+import type { Request, Response } from "express";
+
 const errorModel = {
   type: "object",
   properties: {
@@ -102,12 +104,14 @@ const spec = {
 };
 
 class OpenApiController {
-  constructor(openApiSpec = spec) {
+  spec: Record<string, unknown>;
+
+  constructor(openApiSpec: Record<string, unknown> = spec) {
     this.spec = openApiSpec;
     this.show = this.show.bind(this);
   }
 
-  show(req, res) {
+  show(_req: Request, res: Response) {
     res.json(this.spec);
   }
 }

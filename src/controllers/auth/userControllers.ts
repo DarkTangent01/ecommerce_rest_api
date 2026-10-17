@@ -1,7 +1,9 @@
+import type { NextFunction, Request, Response } from "express";
 import { Cart, Order, Review, User, Wishlist } from "../../models/index.js";
 import { CustomeErrorHandler } from "../../services/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import auditLogger from "../../utils/auditLogger.js";
+import { assertAuthed } from "../../types/http.js";
 
 class UserController {
   constructor() {
@@ -10,8 +12,9 @@ class UserController {
     this.deleteData = this.deleteData.bind(this);
   }
 
-  async users(req, res, next) {
+  async users(req: Request, res: Response, next: NextFunction) {
     try {
+      assertAuthed(req);
       const user = await User.findById(req.user._id);
       if (!user) {
         return next(CustomeErrorHandler.notFound());
@@ -23,8 +26,9 @@ class UserController {
     }
   }
 
-  async exportData(req, res, next) {
+  async exportData(req: Request, res: Response, next: NextFunction) {
     try {
+      assertAuthed(req);
       const [user, orders, cart, wishlist, reviews] = await Promise.all([
         User.findById(req.user._id),
         Order.find({ user: req.user._id }),
@@ -38,9 +42,13 @@ class UserController {
     }
   }
 
-  async deleteData(req, res, next) {
+  async deleteData(req: Request, res: Response, next: NextFunction) {
     try {
-      await User.updateOne({ _id: req.user._id }, { $set: { deletedAt: new Date(), isActive: false, email: `deleted-${req.user._id}@example.invalid`, name: "Deleted User" } });
+      assertAuthed(req);
+      await User.updateOne(
+        { _id: req.user._id },
+        { $set: { deletedAt: new Date(), isActive: false, email: `deleted-${String(req.user._id)}@example.invalid`, name: "Deleted User" } }
+      );
       auditLogger("user.gdpr_delete", req, { user: req.user._id });
       return successResponse(res, null, "User data deletion requested");
     } catch (err) {

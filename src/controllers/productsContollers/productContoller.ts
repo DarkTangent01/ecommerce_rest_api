@@ -1,3 +1,4 @@
+import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import { CustomeErrorHandler } from "../../services/index.js";
@@ -8,13 +9,14 @@ import auditLogger from "../../utils/auditLogger.js";
 import { UPLOAD_MAX_BYTES } from "../../config/index.js";
 import crypto from "crypto";
 import ProductService from "../../services/ProductService.js";
+import { assertAuthed } from "../../types/http.js";
 
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => {
+  destination: (_req, _file, cb) => cb(null, "uploads/"),
+  filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const uniqueName = `${crypto.randomUUID()}${ext}`;
     cb(null, uniqueName);
@@ -24,7 +26,7 @@ const storage = multer.diskStorage({
 const handleMultiPartData = multer({
   storage,
   limits: { fileSize: UPLOAD_MAX_BYTES, files: 1 },
-  fileFilter(req, file, cb) {
+  fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(ext)) {
       return cb(new Error("Only jpg, png and webp images are allowed"));
@@ -33,7 +35,7 @@ const handleMultiPartData = multer({
   },
 }).single("image");
 
-const removeFile = (filePath) => {
+const removeFile = (filePath: string | undefined) => {
   if (!filePath) return;
   fs.unlink(path.isAbsolute(filePath) ? filePath : path.join(global.appRoot || process.cwd(), filePath), (err) => {
     if (err && err.code !== "ENOENT") {
@@ -42,7 +44,7 @@ const removeFile = (filePath) => {
   });
 };
 
-export const assertSafeImage = async (file) => {
+export const assertSafeImage = async (file: Pick<Express.Multer.File, "path">) => {
   const buffer = await fs.promises.readFile(file.path);
   const head = buffer.subarray(0, 16);
   const asciiHead = buffer.subarray(0, Math.min(buffer.length, 512)).toString("utf8").toLowerCase();
@@ -60,6 +62,8 @@ export const assertSafeImage = async (file) => {
 };
 
 class ProductController {
+  productService: ProductService;
+
   constructor(productService = new ProductService()) {
     this.productService = productService;
     this.store = this.store.bind(this);
@@ -69,11 +73,11 @@ class ProductController {
     this.show = this.show.bind(this);
   }
 
-  async store(req, res, next) {
+  store(req: Request, res: Response, next: NextFunction) {
     // Multipart form data
-    handleMultiPartData(req, res, async (err) => {
+    handleMultiPartData(req, res, async (err: unknown) => {
       if (err) {
-        return next(CustomeErrorHandler.badRequest(err.message));
+        return next(CustomeErrorHandler.badRequest((err as Error).message));
       }
       if (!req.file) {
         return next(CustomeErrorHandler.badRequest("Product image is required"));
@@ -92,6 +96,7 @@ class ProductController {
         return next(error);
       }
       try {
+        assertAuthed(req);
         const document = await this.productService.create({
           value,
           filePath,
@@ -108,12 +113,12 @@ class ProductController {
   }
 
   // Updating the products
-  update(req, res, next) {
-    handleMultiPartData(req, res, async (err) => {
+  update(req: Request<{ id: string }>, res: Response, next: NextFunction) {
+    handleMultiPartData(req, res, async (err: unknown) => {
       if (err) {
-        return next(CustomeErrorHandler.badRequest(err.message));
+        return next(CustomeErrorHandler.badRequest((err as Error).message));
       }
-      let filePath;
+      let filePath: string | undefined;
       if (req.file) {
         filePath = req.file.path;
         try {
@@ -129,6 +134,7 @@ class ProductController {
         return next(error);
       }
       try {
+        assertAuthed(req);
         const document = await this.productService.update({
           id: req.params.id,
           value,
@@ -145,7 +151,7 @@ class ProductController {
     });
   }
 
-  async destroy(req, res, next) {
+  async destroy(req: Request<{ id: string }>, res: Response, next: NextFunction) {
     try {
       const document = await this.productService.delete({ id: req.params.id, tenant: req.tenant });
       auditLogger("product.delete", req, { product: document._id });
@@ -155,16 +161,16 @@ class ProductController {
     }
   }
 
-  async index(req, res, next) {
+  async index(req: Request, res: Response, next: NextFunction) {
     try {
       const { data, meta } = await this.productService.list({ query: req.query, tenant: req.tenant });
       return successResponse(res, data, "Products fetched", 200, meta);
-    } catch (err) {
+    } catch {
       return next(CustomeErrorHandler.serverError());
     }
   }
 
-  async show(req, res, next) {
+  async show(req: Request<{ id: string }>, res: Response, next: NextFunction) {
     try {
       const document = await this.productService.show({ id: req.params.id, tenant: req.tenant });
       return successResponse(res, document, "Product fetched");

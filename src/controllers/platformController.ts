@@ -1,3 +1,4 @@
+import type { NextFunction, Request, Response } from "express";
 import { ApiKey, AuditLog, DomainEvent, SagaInstance, SecuritySignal } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import { createScopedApiKey, createSignedUrl, verifySignedUrl } from "../services/securityService.js";
@@ -5,6 +6,9 @@ import { prometheusText, snapshotMetrics } from "../observability/metrics.js";
 import { queueInfo } from "../utils/queue.js";
 import { cache } from "../utils/cache.js";
 import { serviceCatalog } from "../architecture/services.js";
+import { assertAuthed } from "../types/http.js";
+
+const queryString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 class PlatformController {
   constructor() {
@@ -23,16 +27,20 @@ class PlatformController {
     this.stream = this.stream.bind(this);
   }
 
-  readiness(req, res) {
-    return successResponse(res, {
-      status: "ready",
-      cache: cache.backend,
-      queue: queueInfo(),
-      tenant: req.tenant,
-    }, "Readiness check");
+  readiness(req: Request, res: Response) {
+    return successResponse(
+      res,
+      {
+        status: "ready",
+        cache: cache.backend,
+        queue: queueInfo(),
+        tenant: req.tenant,
+      },
+      "Readiness check"
+    );
   }
 
-  metrics(req, res) {
+  metrics(req: Request, res: Response) {
     if (req.accepts("text/plain")) {
       res.type("text/plain").send(prometheusText());
       return;
@@ -40,11 +48,11 @@ class PlatformController {
     return successResponse(res, snapshotMetrics(), "Metrics fetched");
   }
 
-  serviceCatalog(req, res) {
+  serviceCatalog(_req: Request, res: Response) {
     return successResponse(res, serviceCatalog, "Service catalog fetched");
   }
 
-  async events(req, res, next) {
+  async events(req: Request, res: Response, next: NextFunction) {
     try {
       const events = await DomainEvent.find({ tenant: req.tenant }).sort("-createdAt").limit(100);
       return successResponse(res, events, "Domain events fetched");
@@ -53,7 +61,7 @@ class PlatformController {
     }
   }
 
-  async sagas(req, res, next) {
+  async sagas(req: Request, res: Response, next: NextFunction) {
     try {
       const sagas = await SagaInstance.find({ tenant: req.tenant }).sort("-createdAt").limit(100);
       return successResponse(res, sagas, "Sagas fetched");
@@ -62,7 +70,7 @@ class PlatformController {
     }
   }
 
-  async securitySignals(req, res, next) {
+  async securitySignals(req: Request, res: Response, next: NextFunction) {
     try {
       const signals = await SecuritySignal.find({ tenant: req.tenant }).sort("-createdAt").limit(100);
       return successResponse(res, signals, "Security signals fetched");
@@ -71,7 +79,7 @@ class PlatformController {
     }
   }
 
-  async auditTrail(req, res, next) {
+  async auditTrail(req: Request, res: Response, next: NextFunction) {
     try {
       const logs = await AuditLog.find({ tenant: req.tenant }).sort("-sequence").limit(100);
       return successResponse(res, logs, "Audit trail fetched");
@@ -80,9 +88,11 @@ class PlatformController {
     }
   }
 
-  async createApiKey(req, res, next) {
+  async createApiKey(req: Request, res: Response, next: NextFunction) {
     try {
-      const { name, scopes = [], expiresAt } = req.body;
+      assertAuthed(req);
+      // TODO: unvalidated body (audit M7); typed loosely until the Zod schema lands with that fix.
+      const { name, scopes = [], expiresAt } = req.body as { name: string; scopes?: string[]; expiresAt?: Date };
       const { apiKey, key } = await createScopedApiKey({
         name,
         tenant: req.tenant,
@@ -96,7 +106,7 @@ class PlatformController {
     }
   }
 
-  async listApiKeys(req, res, next) {
+  async listApiKeys(req: Request, res: Response, next: NextFunction) {
     try {
       const keys = await ApiKey.find({ tenant: req.tenant }).select("-keyHash");
       return successResponse(res, keys, "API keys fetched");
@@ -105,34 +115,38 @@ class PlatformController {
     }
   }
 
-  signedUrl(req, res) {
-    const path = req.query.path || "/uploads";
-    const subject = req.query.subject || req.user?._id || "";
+  signedUrl(req: Request, res: Response) {
+    const path = queryString(req.query.path) || "/uploads";
+    const subject = queryString(req.query.subject) || (req.user?._id ? String(req.user._id) : "");
     return successResponse(res, { url: createSignedUrl({ path, tenant: req.tenant, subject }) }, "Signed URL created");
   }
 
-  validateSignedUrl(req, res) {
+  validateSignedUrl(req: Request, res: Response) {
     const ok = verifySignedUrl({
-      path: req.query.path,
-      tenant: req.query.tenant,
-      subject: req.query.subject,
-      expires: req.query.expires,
-      signature: req.query.signature,
+      path: queryString(req.query.path),
+      tenant: queryString(req.query.tenant),
+      subject: queryString(req.query.subject),
+      expires: queryString(req.query.expires),
+      signature: queryString(req.query.signature),
     });
     return successResponse(res, { valid: ok }, "Signed URL validation complete");
   }
 
-  securityHeaders(req, res) {
-    return successResponse(res, {
-      contentSecurityPolicy: Boolean(res.getHeader("Content-Security-Policy")),
-      xFrameOptions: Boolean(res.getHeader("X-Frame-Options")),
-      xContentTypeOptions: Boolean(res.getHeader("X-Content-Type-Options")),
-      referrerPolicy: Boolean(res.getHeader("Referrer-Policy")),
-      requestId: res.getHeader("X-Request-Id"),
-    }, "Security headers inspected");
+  securityHeaders(_req: Request, res: Response) {
+    return successResponse(
+      res,
+      {
+        contentSecurityPolicy: Boolean(res.getHeader("Content-Security-Policy")),
+        xFrameOptions: Boolean(res.getHeader("X-Frame-Options")),
+        xContentTypeOptions: Boolean(res.getHeader("X-Content-Type-Options")),
+        referrerPolicy: Boolean(res.getHeader("Referrer-Policy")),
+        requestId: res.getHeader("X-Request-Id"),
+      },
+      "Security headers inspected"
+    );
   }
 
-  stream(req, res) {
+  stream(req: Request, res: Response) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");

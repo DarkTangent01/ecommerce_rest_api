@@ -1,3 +1,4 @@
+import type { NextFunction, Request, Response } from "express";
 import { Tenant } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 
@@ -7,7 +8,7 @@ class TenantController {
     this.upsert = this.upsert.bind(this);
   }
 
-  async current(req, res, next) {
+  async current(req: Request, res: Response, next: NextFunction) {
     try {
       const tenant = await Tenant.findOne({ key: req.tenant });
       return successResponse(res, tenant || { key: req.tenant, status: "implicit" }, "Tenant fetched");
@@ -16,11 +17,13 @@ class TenantController {
     }
   }
 
-  async upsert(req, res, next) {
+  async upsert(req: Request, res: Response, next: NextFunction) {
     try {
+      // TODO: unvalidated mass assignment across tenants (audit H8); typed loosely until that fix.
+      const body = (req.body ?? {}) as Record<string, unknown> & { key?: string };
       const tenant = await Tenant.findOneAndUpdate(
-        { key: String(req.body.key || req.tenant).toLowerCase() },
-        { ...req.body, key: String(req.body.key || req.tenant).toLowerCase() },
+        { key: String(body.key || req.tenant).toLowerCase() },
+        { ...body, key: String(body.key || req.tenant).toLowerCase() },
         { upsert: true, new: true, runValidators: true }
       );
       return successResponse(res, tenant, "Tenant saved");

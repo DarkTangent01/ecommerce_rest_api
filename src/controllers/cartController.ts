@@ -1,8 +1,12 @@
+import type { NextFunction, Request, Response } from "express";
 import { cartItemSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import CartService from "../services/CartService.js";
+import { assertAuthed } from "../types/http.js";
 
 class CartController {
+  cartService: CartService;
+
   constructor(cartService = new CartService()) {
     this.cartService = cartService;
     this.show = this.show.bind(this);
@@ -12,8 +16,9 @@ class CartController {
     this.clear = this.clear.bind(this);
   }
 
-  async show(req, res, next) {
+  async show(req: Request, res: Response, next: NextFunction) {
     try {
+      assertAuthed(req);
       const cart = await this.cartService.show(req.user._id, req.tenant);
       return successResponse(res, cart, "Cart fetched");
     } catch (err) {
@@ -21,11 +26,12 @@ class CartController {
     }
   }
 
-  async addItem(req, res, next) {
+  async addItem(req: Request, res: Response, next: NextFunction) {
     const { error, value } = validate(cartItemSchema, req.body);
     if (error) return next(error);
 
     try {
+      assertAuthed(req);
       const cart = await this.cartService.addItem({
         userId: req.user._id,
         tenant: req.tenant,
@@ -38,11 +44,12 @@ class CartController {
     }
   }
 
-  async updateItem(req, res, next) {
+  async updateItem(req: Request, res: Response, next: NextFunction) {
     const { error, value } = validate(cartItemSchema, req.body);
     if (error) return next(error);
 
     try {
+      assertAuthed(req);
       const cart = await this.cartService.updateItem({
         userId: req.user._id,
         tenant: req.tenant,
@@ -55,8 +62,9 @@ class CartController {
     }
   }
 
-  async removeItem(req, res, next) {
+  async removeItem(req: Request<{ productId: string }>, res: Response, next: NextFunction) {
     try {
+      assertAuthed(req);
       const cart = await this.cartService.removeItem({
         userId: req.user._id,
         tenant: req.tenant,
@@ -68,8 +76,9 @@ class CartController {
     }
   }
 
-  async clear(req, res, next) {
+  async clear(req: Request, res: Response, next: NextFunction) {
     try {
+      assertAuthed(req);
       const cart = await this.cartService.clear(req.user._id, req.tenant);
       return successResponse(res, cart, "Cart cleared");
     } catch (err) {
