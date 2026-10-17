@@ -3,6 +3,10 @@ import type { NextFunction, Request, Response } from "express";
 import { IDEMPOTENCY_TTL_HOURS } from "../config/index.js";
 import { IdempotencyKey } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
+import { logEvent } from "../utils/requestContext.js";
+
+/** A "processing" key older than this is treated as abandoned (e.g. the process crashed mid-request). */
+const STALE_PROCESSING_MS = 2 * 60 * 1000;
 
 const hashBody = (body: unknown) =>
   crypto
@@ -30,7 +34,10 @@ const idempotency = async (req: Request, res: Response, next: NextFunction) => {
       if (existing.status === "completed") {
         return res.status(existing.statusCode || 200).json(existing.response);
       }
-      return next(CustomeErrorHandler.toManyRequest("Request with this idempotency key is still processing"));
+      if (Date.now() - existing.createdAt.getTime() < STALE_PROCESSING_MS) {
+        return next(CustomeErrorHandler.toManyRequest("Request with this idempotency key is still processing"));
+      }
+      await IdempotencyKey.deleteOne({ _id: existing._id, status: "processing" });
     }
 
     const record = await IdempotencyKey.create({
@@ -42,17 +49,25 @@ const idempotency = async (req: Request, res: Response, next: NextFunction) => {
     });
     req.idempotencyRecord = record;
 
+    // Persist the outcome before the response leaves, so an immediate retry replays it. A 5xx
+    // releases the key so the client can retry. Persistence failures are logged, never thrown:
+    // the original handler's response is still delivered.
     const originalJson = res.json.bind(res);
-    // TODO: async override of a sync API; its rejection is unhandled (audit H3, fixed in Phase 4).
-    res.json = (async (payload: unknown) => {
-      if (req.idempotencyRecord && res.statusCode < 500) {
-        req.idempotencyRecord.response = payload;
-        req.idempotencyRecord.statusCode = res.statusCode;
-        req.idempotencyRecord.status = "completed";
-        await req.idempotencyRecord.save();
-      }
-      return originalJson(payload);
-    }) as unknown as Response["json"];
+    res.json = (payload: unknown) => {
+      const statusCode = res.statusCode;
+      const persist =
+        statusCode >= 500
+          ? record.deleteOne()
+          : Object.assign(record, { response: payload, statusCode, status: "completed" as const }).save();
+      persist
+        .catch((err: unknown) => {
+          logEvent("error", "idempotency.persist_failed", req, { key, error: (err as Error).message });
+        })
+        .finally(() => {
+          originalJson(payload);
+        });
+      return res;
+    };
 
     return next();
   } catch (err) {
