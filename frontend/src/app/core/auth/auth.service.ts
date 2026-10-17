@@ -1,91 +1,121 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
-import { ApiClientService } from '../api/api-client.service';
-import { AuthTokens, User } from '../../shared/models/api.models';
+import { Observable, finalize, firstValueFrom, map, shareReplay, switchMap, tap, throwError } from 'rxjs';
+import { AuthApi } from '../api/auth.api';
+import { ApiError } from '../http/api-error';
+import type { AuthTokens, LoginRequest, RegisterRequest, Role, User } from '../models';
+import { TokenStorage } from './token-storage';
 
-const ACCESS_TOKEN_KEY = 'commerce_access_token';
-const REFRESH_TOKEN_KEY = 'commerce_refresh_token';
-const USER_KEY = 'commerce_user';
+export type AuthStatus = 'initializing' | 'authenticated' | 'anonymous';
 
+/**
+ * Signal-based auth state. The role shown in the UI comes from GET /users (the database), never
+ * from decoding the token, and the UI only *hides* privileged features: the backend enforces them.
+ */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly api = inject(ApiClientService);
+  private readonly api = inject(AuthApi);
+  private readonly tokens = inject(TokenStorage);
   private readonly router = inject(Router);
-  private readonly accessTokenState = signal<string | null>(sessionStorage.getItem(ACCESS_TOKEN_KEY));
-  readonly user = signal<User | null>(this.readUser());
-  readonly isAuthenticated = computed(() => Boolean(this.accessTokenState()));
-  readonly role = computed(() => this.user()?.role ?? 'user');
-  stepUpRequired = signal(false);
+  private refreshInFlight$: Observable<string> | null = null;
 
-  accessToken(): string | null {
-    return this.accessTokenState();
+  readonly user = signal<User | null>(null);
+  readonly status = signal<AuthStatus>('initializing');
+  /** Set when the backend flagged the login as risky; sensitive actions will be refused. */
+  readonly stepUpRequired = signal(false);
+  readonly isAuthenticated = computed(() => this.status() === 'authenticated');
+  readonly role = computed<Role | null>(() => this.user()?.role ?? null);
+
+  /** Restores the session from the tab's refresh token. Runs once at startup, before routing. */
+  async init(): Promise<void> {
+    if (!this.tokens.refreshToken) {
+      this.status.set('anonymous');
+      return;
+    }
+    try {
+      await firstValueFrom(this.refreshAccessToken().pipe(switchMap(() => this.loadProfile())));
+    } catch {
+      this.clearSession();
+    }
   }
 
-  refreshToken(): string | null {
-    return sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  login(body: LoginRequest): Observable<User> {
+    return this.api.login(body).pipe(
+      tap((result) => {
+        this.tokens.save(result.access_token, result.refresh_token);
+        this.stepUpRequired.set(result.step_up_required);
+      }),
+      switchMap(() => this.loadProfile()),
+    );
   }
 
-  login(payload: { email: string; password: string }): Observable<AuthTokens> {
-    return this.api.post<AuthTokens>('/login', payload).pipe(
-      tap((tokens) => {
-        this.setTokens(tokens);
-        this.stepUpRequired.set(Boolean(tokens.step_up_required));
+  register(body: RegisterRequest): Observable<User> {
+    return this.api.register(body).pipe(
+      tap((tokens) => this.saveTokens(tokens)),
+      switchMap(() => this.loadProfile()),
+    );
+  }
+
+  loadProfile(): Observable<User> {
+    return this.api.me().pipe(
+      tap((user) => {
+        this.user.set(user);
+        this.status.set('authenticated');
       }),
     );
   }
 
-  register(payload: { name: string; email: string; password: string; repeat_password: string }): Observable<AuthTokens> {
-    return this.api.post<AuthTokens>('/register', payload).pipe(tap((tokens) => this.setTokens(tokens)));
+  accessToken(): string | null {
+    return this.tokens.accessToken;
   }
 
-  loadProfile(): Observable<User> {
-    return this.api.get<User>('/users').pipe(tap((user) => this.setUser(user)));
+  /**
+   * Exchanges the refresh token for a new pair. Single-flight: refresh tokens are one-time use
+   * (rotated by the backend), so concurrent 401s must share one refresh instead of racing.
+   */
+  refreshAccessToken(): Observable<string> {
+    const refreshToken = this.tokens.refreshToken;
+    if (!refreshToken) {
+      return throwError(() => new ApiError(401, 'UNAUTHORIZED', 'Your session has expired. Please sign in again.'));
+    }
+    this.refreshInFlight$ ??= this.api.refresh(refreshToken).pipe(
+      tap((tokens) => this.saveTokens(tokens)),
+      map((tokens) => tokens.access_token),
+      finalize(() => (this.refreshInFlight$ = null)),
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
+    return this.refreshInFlight$;
   }
 
-  refresh(): Observable<AuthTokens> {
-    const refresh_token = this.refreshToken();
-    return this.api.post<AuthTokens>('/refresh', { refresh_token }).pipe(tap((tokens) => this.setTokens(tokens)));
-  }
-
-  logout(redirect = true): void {
-    const refresh_token = this.refreshToken();
-    if (refresh_token && this.accessToken()) {
-      this.api.post<null>('/logout', { refresh_token }).subscribe({ error: () => undefined });
+  /** Signs out locally at once and revokes the refresh token on the server in the background. */
+  logout(redirectTo: string | null = '/'): void {
+    const refreshToken = this.tokens.refreshToken;
+    if (refreshToken && this.tokens.accessToken) {
+      this.api.logout(refreshToken).subscribe({ error: () => undefined });
     }
     this.clearSession();
-    if (redirect) {
-      void this.router.navigateByUrl('/login');
-    }
+    if (redirectTo !== null) void this.router.navigateByUrl(redirectTo);
+  }
+
+  /** Called when a refresh fails: the session cannot be recovered. */
+  sessionExpired(returnUrl: string): void {
+    this.clearSession();
+    void this.router.navigate(['/login'], { queryParams: { returnUrl, reason: 'expired' } });
   }
 
   clearSession(): void {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    sessionStorage.removeItem(USER_KEY);
-    this.accessTokenState.set(null);
+    this.tokens.clear();
     this.user.set(null);
     this.stepUpRequired.set(false);
+    this.status.set('anonymous');
   }
 
-  private setTokens(tokens: AuthTokens): void {
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-    this.accessTokenState.set(tokens.access_token);
+  hasRole(...roles: Role[]): boolean {
+    const role = this.role();
+    return role !== null && roles.includes(role);
   }
 
-  private setUser(user: User): void {
-    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-    this.user.set(user);
-  }
-
-  private readUser(): User | null {
-    const raw = sessionStorage.getItem(USER_KEY);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as User;
-    } catch {
-      return null;
-    }
+  private saveTokens(tokens: AuthTokens): void {
+    this.tokens.save(tokens.access_token, tokens.refresh_token);
   }
 }

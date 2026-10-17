@@ -1,39 +1,60 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { CanActivateFn, provideRouter, UrlTree } from '@angular/router';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { ActivatedRouteSnapshot, CanActivateFn, provideRouter, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { adminGuard, sellerGuard } from './role.guard';
-import { authGuard } from './auth.guard';
+import { authGuard, guestGuard } from './auth.guard';
+import { aUser, testProviders } from '../../../testing/test-helpers';
+import type { Role } from '../models';
 
-const runGuard = (guard: CanActivateFn) => TestBed.runInInjectionContext(() => guard({} as never, {} as never));
+const run = (guard: CanActivateFn, url = '/orders') =>
+  TestBed.runInInjectionContext(() => guard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot));
+
+const urlOf = (result: unknown) => TestBed.inject(Router).serializeUrl(result as UrlTree);
 
 describe('route guards', () => {
+  let auth: AuthService;
+
   beforeEach(() => {
-    sessionStorage.clear();
-    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient()] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), ...testProviders()] });
+    auth = TestBed.inject(AuthService);
+    auth.status.set('anonymous');
   });
 
-  it('redirects anonymous users from protected routes', () => {
-    const result = runGuard(authGuard);
-    expect(result instanceof UrlTree).toBe(true);
+  const signInAs = (role: Role) => {
+    auth.user.set(aUser({ role }));
+    auth.status.set('authenticated');
+  };
+
+  it('authGuard sends anonymous users to login and remembers where they were going', () => {
+    expect(urlOf(run(authGuard, '/orders/o1'))).toBe('/login?returnUrl=%2Forders%2Fo1');
+    signInAs('user');
+    expect(run(authGuard)).toBe(true);
   });
 
-  it('allows authenticated users', () => {
-    sessionStorage.setItem('commerce_access_token', 'token');
-    expect(runGuard(authGuard)).toBe(true);
+  it('guestGuard keeps signed-in users away from login/register', () => {
+    expect(run(guestGuard)).toBe(true);
+    signInAs('user');
+    expect(urlOf(run(guestGuard))).toBe('/');
   });
 
-  it('allows only admins through the admin guard', () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set({ _id: '1', name: 'Admin', email: 'a@example.com', role: 'admin' });
-    expect(runGuard(adminGuard)).toBe(true);
+  it('adminGuard admits admins only', () => {
+    expect(urlOf(run(adminGuard))).toBe('/login');
+    signInAs('user');
+    expect(urlOf(run(adminGuard))).toBe('/unauthorized');
+    signInAs('seller');
+    expect(urlOf(run(adminGuard))).toBe('/unauthorized');
+    signInAs('admin');
+    expect(run(adminGuard)).toBe(true);
   });
 
-  it('allows seller and admin roles through the seller guard', () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set({ _id: '2', name: 'Seller', email: 's@example.com', role: 'seller' });
-    expect(runGuard(sellerGuard)).toBe(true);
-    auth.user.set({ _id: '3', name: 'User', email: 'u@example.com', role: 'user' });
-    expect(runGuard(sellerGuard) instanceof UrlTree).toBe(true);
+  it('sellerGuard admits sellers and admins', () => {
+    signInAs('user');
+    expect(urlOf(run(sellerGuard))).toBe('/unauthorized');
+    signInAs('seller');
+    expect(run(sellerGuard)).toBe(true);
+    signInAs('admin');
+    expect(run(sellerGuard)).toBe(true);
   });
 });

@@ -38,7 +38,7 @@ export class ProfileComponent {
   private readonly toast = inject(ToastService);
   readonly exportData = signal<unknown | null>(null);
   constructor() {
-    this.profile.me().subscribe((user) => this.auth.user.set(user));
+    this.auth.loadProfile().subscribe();
   }
   export(): void {
     this.profile.exportData().subscribe({

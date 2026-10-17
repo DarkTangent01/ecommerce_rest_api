@@ -1,47 +1,81 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { map, Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
-import { ApiEnvelope } from '../../shared/models/api.models';
+import { Observable, map } from 'rxjs';
+import { APP_SETTINGS } from '../config/app.config';
+import { contextFor, type RequestFlags } from '../http/http-context';
+import type { ApiSuccess, PageMeta, Paged } from '../models';
 
 export type QueryValue = string | number | boolean | null | undefined;
+export type Query = Record<string, QueryValue>;
 
+export interface RequestOptions extends RequestFlags {
+  headers?: Record<string, string>;
+}
+
+/**
+ * Thin typed wrapper over HttpClient for the backend envelope. Errors are normalized to ApiError
+ * by the error interceptor, so callers only ever see `data` (or `data` + `meta` for lists).
+ */
 @Injectable({ providedIn: 'root' })
 export class ApiClientService {
   private readonly http = inject(HttpClient);
-  readonly baseUrl = environment.apiBaseUrl.replace(/\/$/, '');
+  readonly baseUrl = inject(APP_SETTINGS).apiBaseUrl;
 
-  get<T>(path: string, query?: Record<string, QueryValue>): Observable<T> {
-    return this.http.get<ApiEnvelope<T>>(this.url(path), { params: this.params(query) }).pipe(map((res) => res.data));
+  get<T>(path: string, query?: Query, options?: RequestOptions): Observable<T> {
+    return this.http
+      .get<ApiSuccess<T>>(this.url(path), { params: this.params(query), ...this.httpOptions(options) })
+      .pipe(map((res) => res.data));
   }
 
-  getEnvelope<T>(path: string, query?: Record<string, QueryValue>): Observable<ApiEnvelope<T>> {
-    return this.http.get<ApiEnvelope<T>>(this.url(path), { params: this.params(query) });
+  /** For list endpoints that return `meta` alongside `data`. */
+  getPage<T, M extends PageMeta = PageMeta>(path: string, query?: Query, options?: RequestOptions): Observable<Paged<T, M>> {
+    return this.http.get<ApiSuccess<T[], M>>(this.url(path), { params: this.params(query), ...this.httpOptions(options) }).pipe(
+      map((res) => ({
+        items: res.data,
+        meta: res.meta ?? ({ page: 1, limit: res.data.length, total: res.data.length, pages: 1 } as M),
+      })),
+    );
   }
 
-  post<T>(path: string, body?: unknown, options?: { headers?: Record<string, string> }): Observable<T> {
-    return this.http.post<ApiEnvelope<T>>(this.url(path), body ?? {}, options).pipe(map((res) => res.data));
+  /** @deprecated Used by the legacy services in domain-api.services.ts until they are removed. */
+  getEnvelope<T>(path: string, query?: Query): Observable<{ success: boolean; message: string; data: T; meta?: Record<string, unknown> }> {
+    return this.http.get<ApiSuccess<T, Record<string, unknown>>>(this.url(path), { params: this.params(query) });
   }
 
-  put<T>(path: string, body?: unknown): Observable<T> {
-    return this.http.put<ApiEnvelope<T>>(this.url(path), body ?? {}).pipe(map((res) => res.data));
+  post<T>(path: string, body: unknown = {}, options?: RequestOptions): Observable<T> {
+    return this.http.post<ApiSuccess<T>>(this.url(path), body, this.httpOptions(options)).pipe(map((res) => res.data));
   }
 
-  delete<T>(path: string): Observable<T> {
-    return this.http.delete<ApiEnvelope<T>>(this.url(path)).pipe(map((res) => res.data));
+  put<T>(path: string, body: unknown = {}, options?: RequestOptions): Observable<T> {
+    return this.http.put<ApiSuccess<T>>(this.url(path), body, this.httpOptions(options)).pipe(map((res) => res.data));
+  }
+
+  delete<T>(path: string, options?: RequestOptions): Observable<T> {
+    return this.http.delete<ApiSuccess<T>>(this.url(path), this.httpOptions(options)).pipe(map((res) => res.data));
+  }
+
+  isApiUrl(url: string): boolean {
+    return url.startsWith(`${this.baseUrl}/`) || url === this.baseUrl;
   }
 
   private url(path: string): string {
     return `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  private params(query?: Record<string, QueryValue>): HttpParams {
+  private params(query?: Query): HttpParams {
     let params = new HttpParams();
-    Object.entries(query ?? {}).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined && value !== null && value !== '') {
         params = params.set(key, String(value));
       }
-    });
+    }
     return params;
+  }
+
+  private httpOptions(options?: RequestOptions) {
+    return {
+      context: contextFor(options),
+      ...(options?.headers && { headers: new HttpHeaders(options.headers) }),
+    };
   }
 }

@@ -1,23 +1,20 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
-export interface ToastMessage {
-  id: number;
-  tone: 'success' | 'error' | 'info';
-  text: string;
-}
+export type ToastTone = 'success' | 'error' | 'info';
 
+/** User-facing notifications via Material snack bars (announced to screen readers). */
 @Injectable({ providedIn: 'root' })
 export class ToastService {
-  readonly messages = signal<ToastMessage[]>([]);
-  private id = 0;
+  private readonly snackBar = inject(MatSnackBar);
 
-  show(text: string, tone: ToastMessage['tone'] = 'info'): void {
-    const toast = { id: ++this.id, tone, text };
-    this.messages.update((items) => [...items, toast]);
-    window.setTimeout(() => this.dismiss(toast.id), 4500);
-  }
-
-  dismiss(id: number): void {
-    this.messages.update((items) => items.filter((item) => item.id !== id));
+  show(text: string, tone: ToastTone = 'info'): void {
+    this.snackBar.open(text, 'Dismiss', {
+      duration: tone === 'error' ? 7000 : 4000,
+      panelClass: `toast-${tone}`,
+      politeness: tone === 'error' ? 'assertive' : 'polite',
+      horizontalPosition: 'center',
+      verticalPosition: 'bottom',
+    });
   }
 }

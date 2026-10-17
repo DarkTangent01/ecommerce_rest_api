@@ -96,7 +96,7 @@ export class AppShellComponent {
   private readonly router = inject(Router);
   readonly menuOpen = signal(false);
   readonly isAdmin = computed(() => this.auth.role() === 'admin');
-  readonly isSeller = computed(() => ['seller', 'admin'].includes(this.auth.role()));
+  readonly isSeller = computed(() => this.auth.hasRole('seller', 'admin'));
   readonly categories = ['Fashion', 'Electronics', 'Home', 'Beauty', 'Sports'];
   searchTerm = '';
   category = '';
