@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import type { Coupon } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const couponSchema = new Schema(
+const couponSchema = new Schema<Coupon>(
   {
     code: { type: String, required: true, uppercase: true, trim: true, index: true },
     type: { type: String, enum: ["percentage", "fixed"], required: true },
@@ -23,4 +24,4 @@ const couponSchema = new Schema(
 
 couponSchema.index({ tenant: 1, code: 1 }, { unique: true });
 
-export default mongoose.model("Coupon", couponSchema, "coupons");
+export default mongoose.model<Coupon>("Coupon", couponSchema, "coupons");

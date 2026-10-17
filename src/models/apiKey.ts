@@ -1,7 +1,20 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const apiKeySchema = new Schema(
+export interface ApiKeyRecord extends Timestamps {
+  _id: ObjectId;
+  name: string;
+  keyHash: string;
+  tenant: string;
+  scopes: string[];
+  status: "active" | "revoked";
+  lastUsedAt?: Date;
+  expiresAt?: Date;
+  createdBy?: ObjectId;
+}
+
+const apiKeySchema = new Schema<ApiKeyRecord>(
   {
     name: { type: String, required: true, trim: true },
     keyHash: { type: String, required: true, unique: true, index: true },
@@ -15,4 +28,4 @@ const apiKeySchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("ApiKey", apiKeySchema, "apiKeys");
+export default mongoose.model<ApiKeyRecord>("ApiKey", apiKeySchema, "apiKeys");

@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import type { User } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const userSchema = new Schema(
+const userSchema = new Schema<User>(
   {
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
@@ -17,11 +18,10 @@ const userSchema = new Schema(
 );
 
 userSchema.set("toJSON", {
-  transform(doc, ret) {
-    delete ret.password;
-    delete ret.__v;
-    return ret;
+  transform(_doc, ret) {
+    const { password: _password, __v: _version, ...safe } = ret;
+    return safe;
   },
 });
 
-export default mongoose.model("User", userSchema, "users");
+export default mongoose.model<User>("User", userSchema, "users");

@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const auditLogSchema = new Schema(
+export interface AuditLogRecord extends Timestamps {
+  _id: ObjectId;
+  sequence: number;
+  action: string;
+  actor?: ObjectId | null;
+  tenant?: string;
+  requestId?: string | null;
+  ip?: string | null;
+  metadata: Record<string, unknown>;
+  previousHash: string;
+  hash: string;
+}
+
+const auditLogSchema = new Schema<AuditLogRecord>(
   {
     sequence: { type: Number, required: true, unique: true, index: true },
     action: { type: String, required: true, index: true },
@@ -16,4 +30,4 @@ const auditLogSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("AuditLog", auditLogSchema, "auditLogs");
+export default mongoose.model<AuditLogRecord>("AuditLog", auditLogSchema, "auditLogs");

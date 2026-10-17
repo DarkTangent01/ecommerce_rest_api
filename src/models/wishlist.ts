@@ -1,7 +1,15 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const wishlistSchema = new Schema(
+export interface WishlistRecord extends Timestamps {
+  _id: ObjectId;
+  user: ObjectId;
+  tenant: string;
+  products: ObjectId[];
+}
+
+const wishlistSchema = new Schema<WishlistRecord>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     tenant: { type: String, default: "default", index: true },
@@ -12,4 +20,4 @@ const wishlistSchema = new Schema(
 
 wishlistSchema.index({ tenant: 1, user: 1 }, { unique: true });
 
-export default mongoose.model("Wishlist", wishlistSchema, "wishlists");
+export default mongoose.model<WishlistRecord>("Wishlist", wishlistSchema, "wishlists");

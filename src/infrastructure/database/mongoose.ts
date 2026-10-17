@@ -5,7 +5,7 @@ import { logEvent } from "../../shared/logging/requestContext.js";
 mongoose.set("bufferCommands", false);
 
 if (ENABLE_QUERY_PROFILING) {
-  mongoose.set("debug", (collection, method, query, doc) => {
+  mongoose.set("debug", (collection: string, method: string, query: unknown, doc: unknown) => {
     logEvent("debug", "db.query", null, { collection, method, query, doc });
   });
 }
@@ -20,7 +20,7 @@ export const connectDatabase = async () => {
 
 export const registerDatabaseEvents = () => {
   const db = mongoose.connection;
-  db.on("error", (err) => {
+  db.on("error", (err: Error) => {
     console.error(`Connection Error: ${err.message}`);
   });
   db.once("open", () => {

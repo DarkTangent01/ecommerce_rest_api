@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import type { Order, OrderItem } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const orderItemSchema = new Schema(
+const orderItemSchema = new Schema<OrderItem>(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: { type: String, required: true },
@@ -11,7 +12,7 @@ const orderItemSchema = new Schema(
   { _id: false }
 );
 
-const orderSchema = new Schema(
+const orderSchema = new Schema<Order>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     tenant: { type: String, default: "default", index: true },
@@ -66,4 +67,4 @@ orderSchema.index({ createdAt: -1 });
 orderSchema.index({ tenant: 1, user: 1, createdAt: -1 });
 orderSchema.index({ tenant: 1, status: 1, paymentStatus: 1 });
 
-export default mongoose.model("Order", orderSchema, "orders");
+export default mongoose.model<Order>("Order", orderSchema, "orders");

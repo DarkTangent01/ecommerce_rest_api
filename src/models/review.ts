@@ -1,7 +1,19 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const reviewSchema = new Schema(
+export interface ReviewRecord extends Timestamps {
+  _id: ObjectId;
+  user: ObjectId;
+  tenant: string;
+  product: ObjectId;
+  rating: number;
+  title?: string;
+  comment?: string;
+  status: "published" | "hidden" | "flagged";
+}
+
+const reviewSchema = new Schema<ReviewRecord>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     tenant: { type: String, default: "default", index: true },
@@ -17,4 +29,4 @@ const reviewSchema = new Schema(
 reviewSchema.index({ tenant: 1, user: 1, product: 1 }, { unique: true });
 reviewSchema.index({ tenant: 1, product: 1, status: 1, createdAt: -1 });
 
-export default mongoose.model("Review", reviewSchema, "reviews");
+export default mongoose.model<ReviewRecord>("Review", reviewSchema, "reviews");

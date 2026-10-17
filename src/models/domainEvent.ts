@@ -1,7 +1,22 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const domainEventSchema = new Schema(
+export interface DomainEventRecord extends Timestamps {
+  _id: ObjectId;
+  type: string;
+  aggregateType: string;
+  aggregateId?: ObjectId;
+  tenant?: string;
+  payload: Record<string, unknown>;
+  correlationId?: string;
+  causationId?: string;
+  idempotencyKey?: string;
+  status: "pending" | "processed" | "failed";
+  processedAt?: Date;
+}
+
+const domainEventSchema = new Schema<DomainEventRecord>(
   {
     type: { type: String, required: true, index: true },
     aggregateType: { type: String, required: true, index: true },
@@ -19,4 +34,4 @@ const domainEventSchema = new Schema(
 
 domainEventSchema.index({ type: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
-export default mongoose.model("DomainEvent", domainEventSchema, "domainEvents");
+export default mongoose.model<DomainEventRecord>("DomainEvent", domainEventSchema, "domainEvents");

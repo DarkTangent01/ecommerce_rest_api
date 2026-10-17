@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import type { Payment } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const paymentEventSchema = new Schema(
+const paymentEventSchema = new Schema<Payment>(
   {
     provider: { type: String, required: true, index: true },
     eventId: { type: String, required: true },
@@ -15,4 +16,4 @@ const paymentEventSchema = new Schema(
 
 paymentEventSchema.index({ provider: 1, eventId: 1 }, { unique: true });
 
-export default mongoose.model("PaymentEvent", paymentEventSchema, "paymentEvents");
+export default mongoose.model<Payment>("PaymentEvent", paymentEventSchema, "paymentEvents");

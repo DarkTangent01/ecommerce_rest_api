@@ -1,7 +1,18 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const documentVersionSchema = new Schema(
+export interface DocumentVersionRecord extends Timestamps {
+  _id: ObjectId;
+  collectionName: string;
+  documentId: ObjectId;
+  version: number;
+  snapshot: unknown;
+  changedBy?: ObjectId;
+  reason?: string;
+}
+
+const documentVersionSchema = new Schema<DocumentVersionRecord>(
   {
     collectionName: { type: String, required: true, index: true },
     documentId: { type: Schema.Types.ObjectId, required: true, index: true },
@@ -15,4 +26,4 @@ const documentVersionSchema = new Schema(
 
 documentVersionSchema.index({ collectionName: 1, documentId: 1, version: 1 }, { unique: true });
 
-export default mongoose.model("DocumentVersion", documentVersionSchema, "documentVersions");
+export default mongoose.model<DocumentVersionRecord>("DocumentVersion", documentVersionSchema, "documentVersions");

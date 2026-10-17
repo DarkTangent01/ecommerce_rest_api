@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const userSessionSchema = new Schema(
+export interface UserSessionRecord extends Timestamps {
+  _id: ObjectId;
+  user: ObjectId;
+  refreshToken?: ObjectId;
+  deviceId: string;
+  userAgent?: string;
+  ip?: string;
+  riskScore: number;
+  stepUpRequired: boolean;
+  lastSeenAt: Date;
+  revokedAt?: Date;
+}
+
+const userSessionSchema = new Schema<UserSessionRecord>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     refreshToken: { type: Schema.Types.ObjectId, ref: "RefreshToken", index: true },
@@ -18,4 +32,4 @@ const userSessionSchema = new Schema(
 
 userSessionSchema.index({ user: 1, deviceId: 1 });
 
-export default mongoose.model("UserSession", userSessionSchema, "userSessions");
+export default mongoose.model<UserSessionRecord>("UserSession", userSessionSchema, "userSessions");

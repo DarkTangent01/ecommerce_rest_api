@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 import { APP_URL } from "../config/index.js";
+import type { Product } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const productSchema = new Schema(
+const productSchema = new Schema<Product>(
   {
     name: { type: String, required: true, trim: true, maxlength: 160, index: true },
     description: { type: String, trim: true, maxlength: 3000, default: "" },
@@ -29,7 +30,7 @@ const productSchema = new Schema(
     image: {
       type: String,
       required: true,
-      get: (image) => {
+      get: (image: string | undefined) => {
         if (!image) return image;
         if (/^https?:\/\//.test(image)) return image;
         return `${APP_URL}/${image.replace(/\\/g, "/")}`;
@@ -44,4 +45,4 @@ productSchema.index({ price: 1, createdAt: -1 });
 productSchema.index({ tenant: 1, isActive: 1, category: 1, createdAt: -1 });
 productSchema.index({ tenant: 1, seller: 1, deletedAt: 1 });
 
-export default mongoose.model("Product", productSchema, "products");
+export default mongoose.model<Product>("Product", productSchema, "products");

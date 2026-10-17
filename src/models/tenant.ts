@@ -1,7 +1,20 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const tenantSchema = new Schema(
+export interface TenantRecord extends Timestamps {
+  _id: ObjectId;
+  key: string;
+  name: string;
+  status: "active" | "suspended";
+  config: {
+    currency: string;
+    locale: string;
+    paymentProvider: string;
+  };
+}
+
+const tenantSchema = new Schema<TenantRecord>(
   {
     key: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     name: { type: String, required: true, trim: true },
@@ -15,4 +28,4 @@ const tenantSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Tenant", tenantSchema, "tenants");
+export default mongoose.model<TenantRecord>("Tenant", tenantSchema, "tenants");

@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+import type { InventoryReservation } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const inventoryReservationSchema = new Schema(
+const inventoryReservationSchema = new Schema<InventoryReservation>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     tenant: { type: String, default: "default", index: true },
@@ -15,4 +16,4 @@ const inventoryReservationSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("InventoryReservation", inventoryReservationSchema, "inventoryReservations");
+export default mongoose.model<InventoryReservation>("InventoryReservation", inventoryReservationSchema, "inventoryReservations");

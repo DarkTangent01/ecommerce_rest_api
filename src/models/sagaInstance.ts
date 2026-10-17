@@ -1,7 +1,24 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const sagaInstanceSchema = new Schema(
+export interface SagaStep {
+  name: string;
+  status: "pending" | "completed" | "failed";
+  completedAt?: Date;
+}
+
+export interface SagaInstanceRecord extends Timestamps {
+  _id: ObjectId;
+  type: string;
+  aggregateId: ObjectId;
+  tenant?: string;
+  status: "running" | "completed" | "compensating" | "failed";
+  steps: SagaStep[];
+  compensations: { name: string; reason: string; at: Date }[];
+}
+
+const sagaInstanceSchema = new Schema<SagaInstanceRecord>(
   {
     type: { type: String, required: true, index: true },
     aggregateId: { type: Schema.Types.ObjectId, required: true, index: true },
@@ -19,4 +36,4 @@ const sagaInstanceSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("SagaInstance", sagaInstanceSchema, "sagaInstances");
+export default mongoose.model<SagaInstanceRecord>("SagaInstance", sagaInstanceSchema, "sagaInstances");

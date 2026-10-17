@@ -1,35 +1,39 @@
+import type { HydratedDocument, Types } from "mongoose";
 import { InventoryReservation, Order, PaymentEvent, Product } from "../models/index.js";
+import type { InventoryReservation as Reservation, Order as OrderShape, Payment } from "../types/domain.js";
+
+type Id = Types.ObjectId | string;
 
 class PaymentRepository {
-  findEvent(provider, eventId) {
+  findEvent(provider: string, eventId: string) {
     return PaymentEvent.findOne({ provider, eventId });
   }
 
-  createEvent(data) {
+  createEvent(data: Pick<Payment, "provider" | "eventId" | "type" | "payloadHash"> & { order: Id }) {
     return PaymentEvent.create(data);
   }
 
-  findOrderById(orderId) {
+  findOrderById(orderId: Id) {
     return Order.findById(orderId);
   }
 
-  saveOrder(order) {
+  saveOrder(order: HydratedDocument<OrderShape>) {
     return order.save();
   }
 
-  commitReservations(orderId) {
+  commitReservations(orderId: Id) {
     return InventoryReservation.updateMany({ order: orderId, status: "reserved" }, { $set: { status: "committed" } });
   }
 
-  findActiveReservations(orderId) {
+  findActiveReservations(orderId: Id) {
     return InventoryReservation.find({ order: orderId, status: { $in: ["reserved", "committed"] } });
   }
 
-  restoreProductStock(productId, quantity) {
+  restoreProductStock(productId: Id, quantity: number) {
     return Product.updateOne({ _id: productId }, { $inc: { stock: quantity } });
   }
 
-  saveReservation(reservation) {
+  saveReservation(reservation: HydratedDocument<Reservation>) {
     return reservation.save();
   }
 }

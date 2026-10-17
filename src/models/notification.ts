@@ -1,7 +1,19 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const notificationSchema = new Schema(
+export interface NotificationRecord extends Timestamps {
+  _id: ObjectId;
+  user?: ObjectId;
+  tenant: string;
+  channel: "email" | "sms" | "webhook";
+  template: string;
+  payload: Record<string, unknown>;
+  status: "queued" | "sent" | "failed";
+  attempts: number;
+}
+
+const notificationSchema = new Schema<NotificationRecord>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", index: true },
     tenant: { type: String, default: "default", index: true },
@@ -14,4 +26,4 @@ const notificationSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Notification", notificationSchema, "notifications");
+export default mongoose.model<NotificationRecord>("Notification", notificationSchema, "notifications");

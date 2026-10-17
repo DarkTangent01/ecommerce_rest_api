@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
+import type { ObjectId, Timestamps } from "../types/domain.js";
 const Schema = mongoose.Schema;
 
-const shipmentSchema = new Schema(
+export type ShipmentStatus = "pending" | "label_created" | "in_transit" | "delivered" | "failed";
+
+export interface ShipmentRecord extends Timestamps {
+  _id: ObjectId;
+  order: ObjectId;
+  tenant: string;
+  carrier?: string;
+  trackingNumber?: string;
+  status: ShipmentStatus;
+  trackingUrl?: string;
+  updatedBy?: ObjectId;
+}
+
+const shipmentSchema = new Schema<ShipmentRecord>(
   {
     order: { type: Schema.Types.ObjectId, ref: "Order", required: true, unique: true, index: true },
     tenant: { type: String, default: "default", index: true },
@@ -14,4 +28,4 @@ const shipmentSchema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Shipment", shipmentSchema, "shipments");
+export default mongoose.model<ShipmentRecord>("Shipment", shipmentSchema, "shipments");

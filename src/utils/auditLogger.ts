@@ -1,9 +1,12 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import type { Request } from "express";
 import { AuditLog } from "../models/index.js";
 
-const auditLogger = (action, req, metadata = {}) => {
+type AuditRequest = Partial<Pick<Request, "requestId" | "user" | "ip" | "method" | "originalUrl" | "tenant" | "get">>;
+
+const auditLogger = (action: string, req: AuditRequest, metadata: Record<string, unknown> = {}) => {
   const logsDirectory = path.join(process.cwd(), "logs");
   if (!fs.existsSync(logsDirectory)) {
     fs.mkdirSync(logsDirectory, { recursive: true });
@@ -28,12 +31,12 @@ const auditLogger = (action, req, metadata = {}) => {
     }
   });
 
-  writeTamperProofAudit(action, req, metadata).catch((err) => {
+  writeTamperProofAudit(action, req, metadata).catch((err: unknown) => {
     console.error("Tamper-proof audit write failed", err);
   });
 };
 
-export const writeTamperProofAudit = async (action, req, metadata = {}) => {
+export const writeTamperProofAudit = async (action: string, req: AuditRequest, metadata: Record<string, unknown> = {}) => {
   const last = await AuditLog.findOne().sort("-sequence");
   const sequence = (last?.sequence || 0) + 1;
   const previousHash = last?.hash || "GENESIS";
