@@ -7,6 +7,23 @@ import { assertSafeExternalUrl } from "../utils/ssrf.js";
 import auditLogger from "../utils/auditLogger.js";
 import { publishEvent } from "../infra/events/eventBus.js";
 import { assertAuthed } from "../types/http.js";
+import type { OrderStatus } from "../types/domain.js";
+import type { ShipmentStatus } from "../models/shipment.js";
+
+const SHIPPABLE_STATUSES: OrderStatus[] = ["confirmed", "processing", "shipped"];
+
+// Previously every shipment update except "delivered" marked the order shipped, including a
+// just-created label or a failed delivery. A failed shipment leaves the order status alone.
+const ORDER_STATUS_FOR_SHIPMENT: Record<ShipmentStatus, OrderStatus | null> = {
+  pending: "processing",
+  label_created: "processing",
+  in_transit: "shipped",
+  delivered: "delivered",
+  failed: null,
+};
+
+// Shipment updates only ever move an order forward.
+const FULFILMENT_RANK: Partial<Record<OrderStatus, number>> = { confirmed: 0, processing: 1, shipped: 2, delivered: 3 };
 
 class ShipmentController {
   constructor() {
@@ -21,6 +38,9 @@ class ShipmentController {
       if (value.trackingUrl) assertSafeExternalUrl(value.trackingUrl);
       const order = await Order.findOne({ _id: req.params.orderId, tenant: req.tenant });
       if (!order) return next(CustomeErrorHandler.notFound("Order not found"));
+      if (order.paymentStatus !== "paid" || !SHIPPABLE_STATUSES.includes(order.status)) {
+        return next(CustomeErrorHandler.conflict(`Order cannot be shipped while ${order.status}/${order.paymentStatus}`));
+      }
       if (req.user.role === "seller") {
         const sellerProductIds = await Product.find({ seller: req.user._id, tenant: req.tenant }).distinct("_id");
         const hasSellerItem = order.items.some((item) => sellerProductIds.some((id) => String(id) === String(item.product)));
@@ -31,8 +51,11 @@ class ShipmentController {
         { ...value, tenant: req.tenant, updatedBy: req.user._id },
         { upsert: true, new: true, runValidators: true }
       );
-      order.status = value.status === "delivered" ? "delivered" : "shipped";
-      await order.save();
+      const nextStatus = ORDER_STATUS_FOR_SHIPMENT[value.status];
+      if (nextStatus && FULFILMENT_RANK[nextStatus]! > (FULFILMENT_RANK[order.status] ?? -1)) {
+        order.status = nextStatus;
+        await order.save();
+      }
       auditLogger("shipment.upsert", req, { order: order._id, shipment: shipment._id });
       await publishEvent({
         type: "shipment.updated",

@@ -8,14 +8,16 @@ class AnalyticsController {
     this.admin = this.admin.bind(this);
   }
 
-  async admin(_req: Request, res: Response, next: NextFunction) {
+  async admin(req: Request, res: Response, next: NextFunction) {
     try {
+      // Scoped to the admin's tenant; these figures used to cover every tenant in the database.
+      const tenant = req.tenant;
       const [users, products, orders, revenue, reviews] = await Promise.all([
-        User.countDocuments(),
-        Product.countDocuments(),
-        Order.countDocuments(),
-        Order.aggregate<{ total: number }>([{ $match: { paymentStatus: "paid" } }, { $group: { _id: null, total: { $sum: "$total" } } }]),
-        Review.countDocuments(),
+        User.countDocuments({ tenant }),
+        Product.countDocuments({ tenant }),
+        Order.countDocuments({ tenant }),
+        Order.aggregate<{ total: number }>([{ $match: { tenant, paymentStatus: "paid" } }, { $group: { _id: null, total: { $sum: "$total" } } }]),
+        Review.countDocuments({ tenant }),
       ]);
       return successResponse(
         res,
