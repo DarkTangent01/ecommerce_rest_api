@@ -36,7 +36,26 @@ const auditLogger = (action: string, req: AuditRequest, metadata: Record<string,
   });
 };
 
-export const writeTamperProofAudit = async (action: string, req: AuditRequest, metadata: Record<string, unknown> = {}) => {
+// The hash chain needs a strict sequence. Writes are serialized within this process, and a
+// duplicate sequence from another process is retried against the new chain head.
+let chain: Promise<unknown> = Promise.resolve();
+const MAX_ATTEMPTS = 5;
+
+export const writeTamperProofAudit = (action: string, req: AuditRequest, metadata: Record<string, unknown> = {}) => {
+  const write = chain.then(async () => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await appendAuditEntry(action, req, metadata);
+      } catch (err) {
+        if ((err as { code?: number }).code !== 11000 || attempt >= MAX_ATTEMPTS) throw err;
+      }
+    }
+  });
+  chain = write.catch(() => undefined);
+  return write;
+};
+
+const appendAuditEntry = async (action: string, req: AuditRequest, metadata: Record<string, unknown>) => {
   const last = await AuditLog.findOne().sort("-sequence");
   const sequence = (last?.sequence || 0) + 1;
   const previousHash = last?.hash || "GENESIS";
