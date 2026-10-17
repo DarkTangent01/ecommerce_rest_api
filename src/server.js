@@ -15,7 +15,7 @@ import tenantContext from "./middlewares/tenantContext.js";
 import metricsMiddleware from "./middlewares/metricsMiddleware.js";
 import sanitizeInput from "./middlewares/sanitizeInput.js";
 import sanitizeNoSql from "./middlewares/sanitizeNoSql.js";
-import { connectDatabase, mongoose, registerDatabaseEvents } from "./infrastructure/database/mongoose.js";
+import { connectDatabase, registerDatabaseEvents } from "./infrastructure/database/mongoose.js";
 
 
 const app = express();

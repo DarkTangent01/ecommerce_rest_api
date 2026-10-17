@@ -7,16 +7,6 @@ const errorModel = {
   },
 };
 
-const successEnvelope = (schema) => ({
-  type: "object",
-  properties: {
-    success: { type: "boolean", example: true },
-    message: { type: "string" },
-    data: schema,
-    meta: { type: "object" },
-  },
-});
-
 const spec = {
   openapi: "3.0.3",
   info: {
