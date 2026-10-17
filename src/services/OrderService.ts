@@ -12,6 +12,7 @@ import { runInTransaction, sessionOption } from "../infrastructure/database/tran
 import { emitAlert } from "../observability/metrics.js";
 import auditLogger from "../utils/auditLogger.js";
 import { buildPagination } from "../utils/pagination.js";
+import { fromCents, toCents } from "../utils/money.js";
 import { logEvent } from "../utils/requestContext.js";
 import type { AuthedRequest } from "../types/http.js";
 import type { Address, InventoryReservation as Reservation, Order as OrderShape, OrderItem } from "../types/domain.js";
@@ -49,7 +50,7 @@ class OrderService {
 
       const orderItems: OrderItem[] = [];
       const reservations: ReservationDoc[] = [];
-      let subtotal = 0;
+      let subtotalCents = 0;
       const reservationExpiresAt = new Date(Date.now() + INVENTORY_RESERVATION_MINUTES * 60 * 1000);
 
       for (const item of cart.items) {
@@ -80,17 +81,20 @@ class OrderService {
         undo.push(() => InventoryReservation.updateOne({ _id: reservation!._id }, { $set: { status: "released" } }));
 
         reservations.push(reservation!);
-        subtotal += product.price * item.quantity;
+        const unitCents = toCents(product.price);
+        subtotalCents += unitCents * item.quantity;
         orderItems.push({
           product: product._id,
           name: product.name,
-          price: product.price,
+          price: fromCents(unitCents),
           quantity: item.quantity,
         });
       }
 
-      const { coupon, discount } = await validateCouponForUser(value.couponCode, req.user._id, subtotal, session, req.tenant);
-      const total = Math.max(subtotal - discount, 0);
+      const { coupon, discountCents } = await validateCouponForUser(value.couponCode, req.user._id, subtotalCents, session, req.tenant);
+      const subtotal = fromCents(subtotalCents);
+      const discount = fromCents(discountCents);
+      const total = fromCents(Math.max(subtotalCents - discountCents, 0));
 
       if (coupon) {
         // Atomic check-and-increment so concurrent checkouts cannot exceed usageLimit.

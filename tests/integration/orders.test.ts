@@ -47,6 +47,27 @@ describe("checkout (replica set, transactional)", () => {
   });
 });
 
+describe("money math (audit H11)", () => {
+  it("computes exact totals instead of float sums", async () => {
+    const { auth } = await createUser();
+    const product = await createProduct({ price: 0.1, stock: 10 });
+    await addToCart(auth, product._id, 3);
+    const res = await checkout(auth);
+    // Previously 0.30000000000000004.
+    expect(res.body.data).toMatchObject({ subtotal: 0.3, total: 0.3 });
+  });
+
+  it("rounds percentage discounts to the cent", async () => {
+    await Coupon.create({ code: "TEN", type: "percentage", value: 10, usageLimit: 5, perUserLimit: 1, tenant: TENANT });
+    const { auth } = await createUser();
+    const product = await createProduct({ price: 19.99, stock: 10 });
+    await addToCart(auth, product._id, 3);
+    const res = await checkout(auth, { couponCode: "TEN" });
+    // Previously discountTotal 5.997 and total 53.973.
+    expect(res.body.data).toMatchObject({ subtotal: 59.97, discountTotal: 6, total: 53.97 });
+  });
+});
+
 describe("cancellation", () => {
   it("returns stock exactly once when cancel is called concurrently", async () => {
     const { auth } = await createUser();

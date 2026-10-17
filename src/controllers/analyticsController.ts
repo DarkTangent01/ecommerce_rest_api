@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { Order, Product, Review, User } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
+import { roundMoney } from "../utils/money.js";
 
 class AnalyticsController {
   constructor() {
@@ -22,7 +23,7 @@ class AnalyticsController {
           users,
           products,
           orders,
-          revenue: revenue[0]?.total || 0,
+          revenue: roundMoney(revenue[0]?.total || 0),
           reviews,
         },
         "Admin analytics fetched"

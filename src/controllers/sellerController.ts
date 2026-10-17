@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Order, Product } from "../models/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import { assertAuthed } from "../types/http.js";
+import { fromCents, toCents } from "../utils/money.js";
 
 class SellerController {
   constructor() {
@@ -18,16 +19,17 @@ class SellerController {
       const orders = await Order.find({ tenant: req.tenant, "items.product": { $in: productIds } })
         .sort("-createdAt")
         .limit(50);
-      const revenue = orders
+      const revenueCents = orders
         .filter((order) => order.paymentStatus === "paid")
         .reduce(
           (sum, order) =>
             sum +
             order.items
               .filter((item) => productIds.some((id) => String(id) === String(item.product)))
-              .reduce((lineSum, item) => lineSum + item.price * item.quantity, 0),
+              .reduce((lineSum, item) => lineSum + toCents(item.price) * item.quantity, 0),
           0
         );
+      const revenue = fromCents(revenueCents);
 
       return successResponse(
         res,
