@@ -720,7 +720,7 @@ docker run --env-file .env -p 5000:5000 ecommerce-rest-api
 
 Dockerfile properties:
 
-- Compiles TypeScript in a `node:20-alpine` build stage; runs `dist/` on `node:18-alpine` (Node 20 runtime upgrade pending).
+- Compiles TypeScript in a `node:20-alpine` build stage and runs `dist/` on `node:20-alpine`.
 - Installs production dependencies only in the runtime image.
 - Runs as non-root `appuser`.
 - Includes API healthcheck.

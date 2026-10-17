@@ -161,7 +161,7 @@ No routes were added, removed or renamed. Response fields were only **added**. T
 
 **Open items, deliberately not done:**
 
-- **Node 18 runtime in Docker is EOL.** The image builds on Node 20 but runs on 18 pending your sign-off (a major runtime upgrade). The Docker build itself was **not verified**, because Docker isn't installed on this machine.
+- The Docker image now builds and runs on `node:20-alpine` (runtime upgraded from the EOL Node 18 with approval). The Docker build itself was **not verified**, because Docker isn't installed on this machine.
 - **No MFA.** Step-up blocks risky sessions but offers no way to complete a challenge.
 - **No refresh-token reuse detection.** Presenting a revoked token could revoke the whole token family.
 - Login timing: bcrypt only runs when the email exists, which allows user enumeration by timing.

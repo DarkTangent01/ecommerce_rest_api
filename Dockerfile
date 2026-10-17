@@ -1,4 +1,4 @@
-# --- build: compile TypeScript (dev tooling such as TypeScript/ESLint needs Node >= 20) ---
+# --- build: compile TypeScript ---
 FROM node:20-alpine AS build
 
 WORKDIR /app
@@ -11,14 +11,12 @@ COPY src ./src
 RUN yarn build
 
 # --- runtime: production dependencies + compiled output only ---
-# TODO: Node 18 is end-of-life; moving the runtime to node:20-alpine is pending sign-off.
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
 COPY package.json yarn.lock ./
-# --ignore-engines: the lockfile includes dev tools that declare Node >= 20; none are installed here.
-RUN yarn install --frozen-lockfile --production --ignore-engines && yarn cache clean
+RUN yarn install --frozen-lockfile --production && yarn cache clean
 
 COPY --from=build /app/dist ./dist
 
