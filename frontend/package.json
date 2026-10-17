@@ -6,9 +6,16 @@
     "start": "ng serve",
     "dev": "ng serve --port=5173 --host=127.0.0.1",
     "build": "ng build",
+    "build:dev": "ng build --configuration development",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "lint": "ng lint"
+    "test": "ng test --watch=false",
+    "test:watch": "ng test",
+    "lint": "ng lint",
+    "format": "prettier --write \"src/**/*.{ts,html,scss,json}\" \"e2e/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\" \"e2e/**/*.ts\""
+  },
+  "engines": {
+    "node": ">=20.19"
   },
   "private": true,
   "packageManager": "npm@10.9.2",

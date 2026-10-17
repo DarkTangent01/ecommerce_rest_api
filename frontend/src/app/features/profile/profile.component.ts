@@ -25,7 +25,7 @@ import { ToastService } from '../../shared/components/toast.service';
       </article>
     </section>
     <section class="section">
-      <button class="button ghost" (click)="export()">Export my data</button>
+      <button class="button ghost" type="button" (click)="export()">Export my data</button>
       @if (exportData()) {
         <pre class="json-panel">{{ exportData() | json }}</pre>
       }

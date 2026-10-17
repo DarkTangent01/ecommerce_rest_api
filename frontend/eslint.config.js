@@ -18,6 +18,8 @@ module.exports = defineConfig([
       // TEMPORARY: the v22 migration pinned legacy components to Eager change detection.
       // They are being rewritten as OnPush; this goes back to 'error' once none remain.
       '@angular-eslint/prefer-on-push-component-change-detection': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@angular-eslint/directive-selector': [
         'error',
         {
@@ -39,6 +41,11 @@ module.exports = defineConfig([
   {
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
-    rules: {},
+    rules: {
+      // $any() is an escape hatch from strict templates; type the component instead.
+      '@angular-eslint/template/no-any': 'error',
+      '@angular-eslint/template/prefer-control-flow': 'error',
+      '@angular-eslint/template/button-has-type': 'error',
+    },
   },
 ]);

@@ -77,7 +77,7 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
           </div>
           <label
             >Sort
-            <select [value]="sort()" (change)="sort.set($any($event.target).value); applyFilters()">
+            <select [value]="sort()" (change)="onSortChange($event)">
               <option value="createdAt:desc">Newest</option>
               <option value="price:asc">Price: Low to High</option>
               <option value="price:desc">Price: High to Low</option>
@@ -108,6 +108,7 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
           @if (meta()) {
             <div class="pagination">
               <button
+                type="button"
                 class="button ghost"
                 [disabled]="page() <= 1"
                 (click)="page.set(page() - 1); load()"
@@ -116,6 +117,7 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
               </button>
               <span>Page {{ meta()?.page }} of {{ meta()?.pages || 1 }}</span>
               <button
+                type="button"
                 class="button ghost"
                 [disabled]="page() >= (meta()?.pages || 1)"
                 (click)="page.set(page() + 1); load()"
@@ -167,6 +169,11 @@ export class ProductListComponent {
       }
       this.load();
     });
+  }
+
+  onSortChange(event: Event): void {
+    this.sort.set((event.target as HTMLSelectElement).value);
+    this.applyFilters();
   }
 
   applyFilters(): void {

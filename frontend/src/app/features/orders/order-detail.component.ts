@@ -33,10 +33,10 @@ import { Order } from '../../shared/models/api.models';
             >View payment status</a
           >
           @if (['pending', 'confirmed'].includes(item.status)) {
-            <button class="button ghost wide" (click)="cancel(item._id)">Cancel order</button>
+            <button class="button ghost wide" type="button" (click)="cancel(item._id)">Cancel order</button>
           }
           @if (item.paymentStatus === 'paid') {
-            <button class="button ghost wide" (click)="refund(item._id)">Request refund</button>
+            <button class="button ghost wide" type="button" (click)="refund(item._id)">Request refund</button>
           }
         </aside>
       </section>
