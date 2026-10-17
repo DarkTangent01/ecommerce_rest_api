@@ -31,16 +31,36 @@ class CartRepository {
     );
   }
 
-  pushItem(userId: Id, tenant: string, productId: Id, quantity: number) {
-    return Cart.findOneAndUpdate(
-      { user: userId, tenant },
-      { $push: { items: { product: productId, quantity } } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+  /**
+   * Adds `quantity` of a product to the cart atomically: increments an existing line, otherwise
+   * pushes a new one guarded by `$ne` so concurrent adds can never create duplicate lines. A
+   * concurrent first insert of the cart surfaces as a duplicate-key error and is retried.
+   */
+  async addQuantity(userId: Id, tenant: string, productId: Id, quantity: number) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const incremented = await Cart.findOneAndUpdate(
+        { user: userId, tenant, "items.product": productId },
+        { $inc: { "items.$.quantity": quantity } },
+        { new: true }
+      );
+      if (incremented) return incremented;
+
+      try {
+        const pushed = await Cart.findOneAndUpdate(
+          { user: userId, tenant, "items.product": { $ne: productId } },
+          { $push: { items: { product: productId, quantity } } },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        if (pushed) return pushed;
+      } catch (err) {
+        if ((err as { code?: number }).code !== 11000) throw err;
+      }
+    }
+    throw new Error("Could not add the item to the cart after concurrent updates");
   }
 
   removeItem(userId: Id, tenant: string, productId: Id) {
-    return Cart.findOneAndUpdate({ user: userId, tenant }, { $pull: { items: { product: productId } } }, { new: true });
+    return this.populateCart(Cart.findOneAndUpdate({ user: userId, tenant }, { $pull: { items: { product: productId } } }, { new: true }));
   }
 
   clear(userId: Id, tenant: string) {

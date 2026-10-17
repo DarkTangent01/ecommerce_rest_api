@@ -30,16 +30,14 @@ class CartService {
     const product = await this.repository.findProduct(productId, tenant);
     if (!product) throw CustomeErrorHandler.notFound("Product not found");
 
+    // Advisory check for a fast, friendly error; checkout re-checks stock atomically.
     const currentCart = await this.repository.findRawForUser(userId, tenant);
     const existingItem = currentCart?.items.find((item) => String(item.product) === String(product._id));
     const requestedQuantity = (existingItem?.quantity || 0) + quantity;
     if (product.stock < requestedQuantity) throw CustomeErrorHandler.badRequest("Insufficient stock");
+    if (requestedQuantity > 999) throw CustomeErrorHandler.badRequest("Quantity per item cannot exceed 999");
 
-    const cart = existingItem
-      ? await this.repository.updateExistingItem(userId, tenant, product._id, requestedQuantity)
-      : await this.repository.pushItem(userId, tenant, product._id, quantity);
-    if (!cart) throw CustomeErrorHandler.notFound("Cart item not found");
-
+    const cart = await this.repository.addQuantity(userId, tenant, product._id, quantity);
     return this.repository.findById(cart._id);
   }
 
