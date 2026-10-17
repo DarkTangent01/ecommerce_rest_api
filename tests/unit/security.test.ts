@@ -5,7 +5,7 @@ import type { Response } from "express";
 import { Types } from "mongoose";
 import { describe, expect, it } from "vitest";
 
-import { registerSchema, loginSchema, productSchema } from "../../src/validators/index.js";
+import { checkoutSchema, registerSchema, loginSchema, productSchema, validate } from "../../src/validators/index.js";
 import { buildPagination, buildSort } from "../../src/utils/pagination.js";
 import CustomeErrorHandler from "../../src/services/CustomeErrorHandler.js";
 import authorize from "../../src/middlewares/authorize.js";
@@ -23,26 +23,63 @@ import { withDistributedLock } from "../../src/infra/locks/distributedLock.js";
 
 describe("validators", () => {
   it("rejects weak passwords", () => {
-    const result = registerSchema.validate({
+    const result = validate(registerSchema, {
       name: "A User",
       email: "a@example.com",
       password: "password",
       repeat_password: "password",
     });
-    expect(result.error).toBeDefined();
+    expect(result.error?.details[0]?.field).toBe("password");
+  });
+
+  it("rejects mismatched repeat_password", () => {
+    const result = validate(registerSchema, {
+      name: "A User",
+      email: "a@example.com",
+      password: "Password123",
+      repeat_password: "Password124",
+    });
+    expect(result.error?.details).toEqual([{ field: "repeat_password", message: "repeat_password must match password" }]);
   });
 
   it("normalises login email and strips unknown fields", () => {
-    const result = loginSchema.validate({ email: "ADMIN@EXAMPLE.COM", password: "AnyLongEnoughPassword", role: "admin" });
+    const result = validate(loginSchema, { email: " ADMIN@EXAMPLE.COM ", password: "AnyLongEnoughPassword", role: "admin" });
     expect(result.error).toBeUndefined();
-    expect(result.value.email).toBe("admin@example.com");
+    expect(result.value?.email).toBe("admin@example.com");
     expect(result.value).not.toHaveProperty("role");
   });
 
   it("strips unknown product fields", () => {
-    const result = productSchema.validate({ name: "Test product", price: 20, stock: 3, unsafe: "nope" });
+    const result = validate(productSchema, { name: "Test product", price: 20, stock: 3, unsafe: "nope" });
     expect(result.error).toBeUndefined();
     expect(result.value).not.toHaveProperty("unsafe");
+  });
+
+  it("converts multipart string fields like Joi did", () => {
+    const result = validate(productSchema, {
+      name: "Form product",
+      price: "19.999",
+      stock: "4",
+      isActive: "false",
+      variants: '[{"sku":"tee-m","price":"5","stock":"1"}]',
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.value).toMatchObject({ price: 20, stock: 4, isActive: false, variants: [{ sku: "TEE-M", price: 5, stock: 1 }] });
+  });
+
+  it("rejects blank required strings", () => {
+    const result = validate(checkoutSchema, {
+      shippingAddress: { line1: "   ", city: "London", state: "London", postalCode: "NW1", country: "UK" },
+    });
+    expect(result.error?.details.map((d) => d.field)).toEqual(["shippingAddress.line1"]);
+  });
+
+  it("applies defaults", () => {
+    const result = validate(checkoutSchema, {
+      shippingAddress: { line1: "1 Road", city: "London", state: "London", postalCode: "NW1", country: "UK" },
+      couponCode: " save10 ",
+    });
+    expect(result.value).toMatchObject({ paymentProvider: "manual", couponCode: "SAVE10" });
   });
 });
 

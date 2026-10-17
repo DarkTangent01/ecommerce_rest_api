@@ -1,4 +1,4 @@
-import { cartItemSchema } from "../validators/index.js";
+import { cartItemSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import CartService from "../services/CartService.js";
 
@@ -22,7 +22,7 @@ class CartController {
   }
 
   async addItem(req, res, next) {
-    const { error, value } = cartItemSchema.validate(req.body);
+    const { error, value } = validate(cartItemSchema, req.body);
     if (error) return next(error);
 
     try {
@@ -39,7 +39,7 @@ class CartController {
   }
 
   async updateItem(req, res, next) {
-    const { error, value } = cartItemSchema.validate(req.body);
+    const { error, value } = validate(cartItemSchema, req.body);
     if (error) return next(error);
 
     try {

@@ -1,6 +1,6 @@
 import { Order, Product, Review } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
-import { reviewSchema } from "../validators/index.js";
+import { reviewSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import mongoose from "mongoose";
 
@@ -31,7 +31,7 @@ class ReviewController {
   }
 
   async create(req, res, next) {
-    const { error, value } = reviewSchema.validate(req.body);
+    const { error, value } = validate(reviewSchema, req.body);
     if (error) return next(error);
 
     try {

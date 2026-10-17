@@ -1,4 +1,4 @@
-import { cancelOrderSchema, checkoutSchema, refundOrderSchema } from "../validators/index.js";
+import { cancelOrderSchema, checkoutSchema, refundOrderSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import OrderService from "../services/OrderService.js";
 
@@ -13,7 +13,7 @@ class OrderController {
   }
 
   async checkout(req, res, next) {
-    const { error, value } = checkoutSchema.validate(req.body);
+    const { error, value } = validate(checkoutSchema, req.body);
     if (error) return next(error);
 
     try {
@@ -43,7 +43,7 @@ class OrderController {
   }
 
   async cancel(req, res, next) {
-    const { error, value } = cancelOrderSchema.validate(req.body);
+    const { error, value } = validate(cancelOrderSchema, req.body);
     if (error) return next(error);
 
     try {
@@ -55,7 +55,7 @@ class OrderController {
   }
 
   async requestRefund(req, res, next) {
-    const { error, value } = refundOrderSchema.validate(req.body);
+    const { error, value } = validate(refundOrderSchema, req.body);
     if (error) return next(error);
 
     try {

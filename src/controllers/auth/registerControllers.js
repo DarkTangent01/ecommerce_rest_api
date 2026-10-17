@@ -1,4 +1,4 @@
-import { registerSchema } from "../../validators/index.js";
+import { registerSchema, validate } from "../../validators/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import AuthService from "../../services/AuthService.js";
 
@@ -9,7 +9,7 @@ class RegisterController {
   }
 
   async register(req, res, next) {
-    const { error, value } = registerSchema.validate(req.body);
+    const { error, value } = validate(registerSchema, req.body);
 
     if (error) {
       return next(error);

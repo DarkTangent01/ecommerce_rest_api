@@ -1,5 +1,5 @@
 import { CustomeErrorHandler } from "../../services/index.js";
-import { refreshSchema } from "../../validators/index.js";
+import { refreshSchema, validate } from "../../validators/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import AuthService from "../../services/AuthService.js";
 
@@ -10,7 +10,7 @@ class RefreshController {
   }
 
   async refresh(req, res, next) {
-    const { error, value } = refreshSchema.validate(req.body);
+    const { error, value } = validate(refreshSchema, req.body);
     if (error) {
       return next(error);
     }

@@ -2,7 +2,7 @@ import multer from "multer";
 import path from "path";
 import { CustomeErrorHandler } from "../../services/index.js";
 import fs from "fs";
-import { productSchema } from "../../validators/index.js";
+import { productSchema, validate } from "../../validators/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import auditLogger from "../../utils/auditLogger.js";
 import { UPLOAD_MAX_BYTES } from "../../config/index.js";
@@ -86,7 +86,7 @@ class ProductController {
       const filePath = req.file.path;
 
       //   Validation
-      const { error, value } = productSchema.validate(req.body);
+      const { error, value } = validate(productSchema, req.body);
       if (error) {
         removeFile(filePath);
         return next(error);
@@ -123,7 +123,7 @@ class ProductController {
         }
       }
       //   Validation
-      const { error, value } = productSchema.validate(req.body);
+      const { error, value } = validate(productSchema, req.body);
       if (error) {
         removeFile(filePath);
         return next(error);

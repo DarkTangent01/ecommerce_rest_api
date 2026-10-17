@@ -1,6 +1,6 @@
 import { Order, Product, Shipment } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
-import { shipmentSchema } from "../validators/index.js";
+import { shipmentSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import { assertSafeExternalUrl } from "../utils/ssrf.js";
 import auditLogger from "../utils/auditLogger.js";
@@ -12,7 +12,7 @@ class ShipmentController {
   }
 
   async upsert(req, res, next) {
-    const { error, value } = shipmentSchema.validate(req.body);
+    const { error, value } = validate(shipmentSchema, req.body);
     if (error) return next(error);
     try {
       if (value.trackingUrl) assertSafeExternalUrl(value.trackingUrl);

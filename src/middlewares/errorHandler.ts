@@ -1,10 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { DEBUG_MODE } from "../config/index.js";
-import Joi from "joi";
 import CustomeErrorHandler from "../services/CustomeErrorHandler.js";
 import { errorResponse } from "../utils/apiResponse.js";
-
-const { ValidationError } = Joi;
+import { RequestValidationError } from "../validators/common.js";
 
 // Express identifies error middleware by its four-argument signature, so `_next` must stay.
 const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
@@ -12,13 +10,10 @@ const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFun
   let message = "Internal server error";
   let details: unknown;
 
-  if (err instanceof ValidationError) {
+  if (err instanceof RequestValidationError) {
     statusCode = 422;
     message = "Validation failed";
-    details = err.details?.map((detail) => ({
-      field: detail.path.join("."),
-      message: detail.message.replace(/"/g, ""),
-    }));
+    details = err.details;
   } else if (err instanceof CustomeErrorHandler) {
     statusCode = err.status;
     message = err.message;

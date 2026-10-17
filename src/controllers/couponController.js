@@ -1,6 +1,6 @@
 import { Coupon } from "../models/index.js";
 import { CustomeErrorHandler } from "../services/index.js";
-import { couponSchema } from "../validators/index.js";
+import { couponSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import auditLogger from "../utils/auditLogger.js";
 
@@ -21,7 +21,7 @@ class CouponController {
   }
 
   async store(req, res, next) {
-    const { error, value } = couponSchema.validate(req.body);
+    const { error, value } = validate(couponSchema, req.body);
     if (error) return next(error);
     try {
       const coupon = await Coupon.create({ ...value, tenant: req.tenant, createdBy: req.user._id });
@@ -34,7 +34,7 @@ class CouponController {
   }
 
   async update(req, res, next) {
-    const { error, value } = couponSchema.validate(req.body);
+    const { error, value } = validate(couponSchema, req.body);
     if (error) return next(error);
     try {
       const coupon = await Coupon.findOneAndUpdate({ _id: req.params.id, tenant: req.tenant, deletedAt: null }, value, { new: true, runValidators: true });

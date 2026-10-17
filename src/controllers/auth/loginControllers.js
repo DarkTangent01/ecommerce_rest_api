@@ -1,4 +1,4 @@
-import { loginSchema, refreshSchema } from "../../validators/index.js";
+import { loginSchema, refreshSchema, validate } from "../../validators/index.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import AuthService from "../../services/AuthService.js";
 import { CustomeErrorHandler } from "../../services/index.js";
@@ -11,7 +11,7 @@ class LoginController {
   }
 
   async login(req, res, next) {
-    const { error, value } = loginSchema.validate(req.body);
+    const { error, value } = validate(loginSchema, req.body);
 
     if (error) {
       return next(error);
@@ -32,7 +32,7 @@ class LoginController {
   }
 
   async logout(req, res, next) {
-    const { error, value } = refreshSchema.validate(req.body);
+    const { error, value } = validate(refreshSchema, req.body);
 
     if (error) {
       return next(error);
