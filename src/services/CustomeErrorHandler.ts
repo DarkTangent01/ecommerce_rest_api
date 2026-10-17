@@ -1,10 +1,9 @@
-class CustomeErrorHandler extends Error {
-  status: number;
+import { AppError, type ErrorCode } from "../shared/errors/AppError.js";
 
-  constructor(status: number, msg?: string) {
-    super();
-    this.status = status;
-    this.message = String(msg || "Error").replace(/[<>{}]/g, "");
+/** Factory helpers for {@link AppError}. Kept under its original name for existing call sites. */
+class CustomeErrorHandler extends AppError {
+  constructor(status: number, msg?: string, options: { code?: ErrorCode; details?: unknown } = {}) {
+    super(status, msg, options);
   }
 
   static alreadyExist(message?: string) {
@@ -27,8 +26,16 @@ class CustomeErrorHandler extends Error {
     return new CustomeErrorHandler(404, message);
   }
 
+  static conflict(message = "Conflict") {
+    return new CustomeErrorHandler(409, message);
+  }
+
   static serverError(message = "Internal server error") {
     return new CustomeErrorHandler(500, message);
+  }
+
+  static serviceUnavailable(message = "Service unavailable") {
+    return new CustomeErrorHandler(503, message);
   }
 
   static toManyRequest(message = "To many request, Try again later.") {

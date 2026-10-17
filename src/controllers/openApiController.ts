@@ -5,7 +5,16 @@ const errorModel = {
   properties: {
     success: { type: "boolean", example: false },
     message: { type: "string", example: "Validation failed" },
-    details: { type: "array", items: { type: "object" } },
+    data: { type: "object", nullable: true, example: null },
+    error: {
+      type: "object",
+      properties: {
+        code: { type: "string", example: "VALIDATION_FAILED" },
+        message: { type: "string", example: "Validation failed" },
+        details: { type: "array", items: { type: "object" } },
+      },
+    },
+    details: { type: "array", items: { type: "object" }, description: "Deprecated: same as error.details" },
   },
 };
 

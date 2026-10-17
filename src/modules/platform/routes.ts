@@ -2,17 +2,11 @@ import type { Router } from "express";
 import { openApiController, platformController } from "./controller.js";
 import { admin, adminNetworkPolicy, apiKeyAuth, auth, sensitiveLimiter, serviceAuth, stepUpAuth } from "./policy.js";
 import { productController } from "../catalog/controller.js";
+import { successResponse } from "../../utils/apiResponse.js";
 
 export const registerPlatformRoutes = (router: Router) => {
-  router.get("/health", (req, res) => {
-    res.json({
-      success: true,
-      message: "OK",
-      data: {
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-      },
-    });
+  router.get("/health", (_req, res) => {
+    successResponse(res, { uptime: process.uptime(), timestamp: new Date().toISOString() }, "OK");
   });
   router.get("/ready", platformController.readiness);
   router.get("/metrics", [auth, admin, adminNetworkPolicy], platformController.metrics);

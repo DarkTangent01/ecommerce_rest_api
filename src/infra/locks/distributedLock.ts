@@ -1,10 +1,10 @@
+import { AppError } from "../../shared/errors/AppError.js";
+
 const locks = new Map<string, number>();
 
-export class LockedError extends Error {
-  status = 423;
-
+export class LockedError extends AppError {
   constructor(message = "Resource is locked") {
-    super(message);
+    super(423, message);
   }
 }
 
