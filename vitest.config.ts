@@ -9,5 +9,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     testTimeout: 30_000,
     fileParallelism: false,
+    // Drop the app's structured JSON request logs; keep everything else.
+    onConsoleLog: (log) => !log.startsWith('{"at":'),
   },
 });

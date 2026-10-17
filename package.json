@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "validate": "node scripts/check-syntax.js",
+    "migrate:reservations-ttl": "tsx scripts/migrations/001-drop-reservation-ttl.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "audit:deps": "yarn audit",

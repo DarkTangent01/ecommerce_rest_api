@@ -11,9 +11,13 @@ const inventoryReservationSchema = new Schema<InventoryReservation>(
     variantSku: { type: String, trim: true, uppercase: true },
     quantity: { type: Number, required: true, min: 1 },
     status: { type: String, enum: ["reserved", "committed", "released", "expired"], default: "reserved", index: true },
-    expiresAt: { type: Date, required: true, index: { expires: 0 } },
+    // Not a TTL index: MongoDB would delete the document without returning its stock (audit C2).
+    // Expired reservations are released by services/inventoryService#releaseExpiredReservations.
+    expiresAt: { type: Date, required: true },
   },
   { timestamps: true }
 );
+
+inventoryReservationSchema.index({ status: 1, expiresAt: 1 });
 
 export default mongoose.model<InventoryReservation>("InventoryReservation", inventoryReservationSchema, "inventoryReservations");

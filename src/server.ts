@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import type { Server } from "http";
-import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT } from "./config/index.js";
+import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT, RESERVATION_SWEEP_SECONDS } from "./config/index.js";
+import { startReservationSweeper } from "./services/inventoryService.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import helmet from "helmet";
 import cors from "cors";
@@ -32,6 +33,7 @@ const startServer = async (): Promise<Server> => {
   } catch (err) {
     console.error(`[!] DB connection failed: ${(err as Error).message}`);
   }
+  startReservationSweeper(RESERVATION_SWEEP_SECONDS);
 
   return app.listen(APP_PORT, () => console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`));
 };
