@@ -5,7 +5,7 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**", "frontend/**", "logs/**", "uploads/**"],
+    ignores: ["dist/**", "coverage/**", "node_modules/**", "frontend/**", "logs/**", "uploads/**", "tests/e2e/**"],
   },
   js.configs.recommended,
   {
@@ -30,6 +30,16 @@ export default tseslint.config(
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": ["error", { checksVoidReturn: { arguments: false } }],
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
+    },
+  },
+  {
+    // Test fakes return plain values from async methods, and supertest bodies are untyped JSON.
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
     },
   },
   {

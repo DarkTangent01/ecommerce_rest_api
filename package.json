@@ -18,8 +18,6 @@
     "validate": "node scripts/check-syntax.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:legacy": "node tests/security/security.test.js && node tests/unit/oop.test.js && node tests/integration/runtime.test.js",
-    "test:e2e:mongo": "node tests/e2e/mongo.test.js",
     "audit:deps": "yarn audit",
     "scan:security": "yarn audit && yarn validate && yarn test",
     "load:test": "node scripts/load-test.js",
