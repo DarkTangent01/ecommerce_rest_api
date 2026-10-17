@@ -1,3 +1,41 @@
+// Include theming for Angular Material with `mat.theme()`.
+// This Sass mixin will define CSS variables that are used for styling Angular Material
+// components according to the Material 3 design spec.
+// Learn more about theming and how to use it for your application's
+// custom components at https://material.angular.dev/guide/theming
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+body {
+  // Default the application to a light color theme. This can be changed to
+  // `dark` to enable the dark color theme, or to `light dark` to defer to the
+  // user's system settings.
+  color-scheme: light;
+
+  // Set a default background, font and text colors for the application using
+  // Angular Material's system-level CSS variables. Learn more about these
+  // variables at https://material.angular.dev/guide/system-variables
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+
+  // Reset the user agent margin.
+  margin: 0;
+  height: 100%;
+}
 :root {
   color-scheme: light;
   --bg: #f5f6f8;
@@ -26,7 +64,14 @@ body {
   min-width: 320px;
   background: var(--bg);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 
 a {
@@ -350,7 +395,8 @@ label {
   padding: clamp(28px, 6vw, 64px);
   background:
     linear-gradient(120deg, rgba(15, 118, 110, 0.92), rgba(23, 32, 42, 0.86)),
-    url("https://images.unsplash.com/photo-1607083206968-13611e3d76db?auto=format&fit=crop&w=1400&q=80") center/cover;
+    url('https://images.unsplash.com/photo-1607083206968-13611e3d76db?auto=format&fit=crop&w=1400&q=80')
+      center/cover;
   color: #fff;
 }
 
@@ -375,7 +421,8 @@ label {
   padding: 28px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.2), #fff 70%),
-    url("https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=900&q=80") top center/cover;
+    url('https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=900&q=80')
+      top center/cover;
 }
 
 .store-hero-card strong {
@@ -431,7 +478,9 @@ label {
   display: grid;
   gap: 8px;
   padding: 18px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .category-tile:hover,
@@ -500,7 +549,9 @@ label {
 
 .shop-card {
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .shop-card-media {
@@ -978,9 +1029,7 @@ label {
   display: grid;
   min-height: calc(100vh - 126px);
   place-items: center;
-  background:
-    linear-gradient(120deg, rgba(15, 118, 110, 0.1), rgba(255, 107, 53, 0.12)),
-    var(--bg);
+  background: linear-gradient(120deg, rgba(15, 118, 110, 0.1), rgba(255, 107, 53, 0.12)), var(--bg);
 }
 
 .auth-panel {
