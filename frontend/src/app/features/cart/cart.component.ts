@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CartApiService } from '../../core/api/domain-api.services';
@@ -11,6 +11,7 @@ import { Product } from '../../shared/models/api.models';
 @Component({
   selector: 'app-cart',
   imports: [CurrencyPipe, RouterLink, EmptyStateComponent, FormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="page-header cart-header">
       <div>
@@ -28,18 +29,36 @@ import { Product } from '../../shared/models/api.models';
             <article class="cart-item-card">
               <img [src]="productOf(item.product).image" [alt]="productOf(item.product).name" />
               <div class="cart-item-main">
-                <span class="product-badge">{{ productOf(item.product).stock > 0 ? 'IN STOCK' : 'OUT OF STOCK' }}</span>
+                <span class="product-badge">{{
+                  productOf(item.product).stock > 0 ? 'IN STOCK' : 'OUT OF STOCK'
+                }}</span>
                 <h3>{{ productOf(item.product).name }}</h3>
                 <p>{{ productOf(item.product).category || 'General' }}</p>
                 <strong>{{ productOf(item.product).price | currency: 'USD' }}</strong>
               </div>
               <div class="cart-item-actions">
                 <div class="qty-control">
-                  <button type="button" (click)="setQty(productOf(item.product)._id, item.quantity - 1)">-</button>
+                  <button
+                    type="button"
+                    (click)="setQty(productOf(item.product)._id, item.quantity - 1)"
+                  >
+                    -
+                  </button>
                   <span>{{ item.quantity }}</span>
-                  <button type="button" (click)="setQty(productOf(item.product)._id, item.quantity + 1)">+</button>
+                  <button
+                    type="button"
+                    (click)="setQty(productOf(item.product)._id, item.quantity + 1)"
+                  >
+                    +
+                  </button>
                 </div>
-                <button class="text-button" type="button" (click)="remove(productOf(item.product)._id)">Remove</button>
+                <button
+                  class="text-button"
+                  type="button"
+                  (click)="remove(productOf(item.product)._id)"
+                >
+                  Remove
+                </button>
               </div>
             </article>
           }
@@ -47,22 +66,38 @@ import { Product } from '../../shared/models/api.models';
 
         <aside class="summary-panel checkout-summary">
           <h2>Price details</h2>
-          <label>Coupon code
+          <label
+            >Coupon code
             <div class="coupon-row">
               <input [(ngModel)]="couponCode" placeholder="WELCOME10" />
               <button class="button ghost" type="button" (click)="applyCoupon()">Apply</button>
             </div>
           </label>
-          <div class="summary-line"><span>Subtotal</span><strong>{{ cart.subtotal() | currency: 'USD' }}</strong></div>
-          <div class="summary-line"><span>Estimated discount</span><strong>-{{ discount() | currency: 'USD' }}</strong></div>
+          <div class="summary-line">
+            <span>Subtotal</span><strong>{{ cart.subtotal() | currency: 'USD' }}</strong>
+          </div>
+          <div class="summary-line">
+            <span>Estimated discount</span><strong>-{{ discount() | currency: 'USD' }}</strong>
+          </div>
           <div class="summary-line"><span>Delivery</span><strong>Free</strong></div>
-          <div class="summary-total"><span>Total</span><strong>{{ total() | currency: 'USD' }}</strong></div>
-          <a class="button primary wide" [queryParams]="{ couponCode: couponCode || null }" routerLink="/checkout">Proceed to checkout</a>
+          <div class="summary-total">
+            <span>Total</span><strong>{{ total() | currency: 'USD' }}</strong>
+          </div>
+          <a
+            class="button primary wide"
+            [queryParams]="{ couponCode: couponCode || null }"
+            routerLink="/checkout"
+            >Proceed to checkout</a
+          >
           <button class="button ghost wide" type="button" (click)="clear()">Clear cart</button>
         </aside>
       </section>
     } @else {
-      <app-empty-state title="Your cart is empty" description="Add products from the catalog to start checkout." icon="0" />
+      <app-empty-state
+        title="Your cart is empty"
+        description="Add products from the catalog to start checkout."
+        icon="0"
+      />
     }
   `,
 })
@@ -71,7 +106,9 @@ export class CartComponent {
   readonly cart = inject(CartStateService);
   private readonly toast = inject(ToastService);
   couponCode = '';
-  readonly discount = computed(() => (this.couponCode.trim() ? Math.min(this.cart.subtotal() * 0.1, 50) : 0));
+  readonly discount = computed(() =>
+    this.couponCode.trim() ? Math.min(this.cart.subtotal() * 0.1, 50) : 0,
+  );
   readonly total = computed(() => Math.max(this.cart.subtotal() - this.discount(), 0));
 
   constructor() {
@@ -83,7 +120,10 @@ export class CartComponent {
   }
 
   applyCoupon(): void {
-    this.toast.show(this.couponCode ? 'Coupon will be validated during checkout' : 'Enter a coupon code', this.couponCode ? 'info' : 'error');
+    this.toast.show(
+      this.couponCode ? 'Coupon will be validated during checkout' : 'Enter a coupon code',
+      this.couponCode ? 'info' : 'error',
+    );
   }
 
   setQty(productId: string, quantity: number): void {

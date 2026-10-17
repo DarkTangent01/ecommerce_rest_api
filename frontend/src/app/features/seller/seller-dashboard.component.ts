@@ -1,5 +1,5 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SellerApiService } from '../../core/api/domain-api.services';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -9,6 +9,7 @@ import { SellerDashboard } from '../../shared/models/api.models';
 @Component({
   selector: 'app-seller-dashboard',
   imports: [CurrencyPipe, DatePipe, ReactiveFormsModule, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="page-header">
       <p class="eyebrow">Seller</p>
@@ -16,9 +17,15 @@ import { SellerDashboard } from '../../shared/models/api.models';
     </section>
     @if (dashboard(); as data) {
       <section class="dashboard-grid">
-        <article class="stat-card"><span>Products</span><strong>{{ data.productCount }}</strong></article>
-        <article class="stat-card"><span>Revenue</span><strong>{{ data.revenue | currency:'USD' }}</strong></article>
-        <article class="stat-card"><span>Low stock</span><strong>{{ data.lowStock.length }}</strong></article>
+        <article class="stat-card">
+          <span>Products</span><strong>{{ data.productCount }}</strong>
+        </article>
+        <article class="stat-card">
+          <span>Revenue</span><strong>{{ data.revenue | currency: 'USD' }}</strong>
+        </article>
+        <article class="stat-card">
+          <span>Low stock</span><strong>{{ data.lowStock.length }}</strong>
+        </article>
       </section>
       <section class="section split">
         <article class="panel">
@@ -26,11 +33,15 @@ import { SellerDashboard } from '../../shared/models/api.models';
           @for (order of data.recentOrders; track order._id) {
             <div class="order-row">
               <span>#{{ order._id.slice(-8) }}</span>
-              <span>{{ order.createdAt | date:'short' }}</span>
-              <strong>{{ order.total | currency:'USD' }}</strong>
+              <span>{{ order.createdAt | date: 'short' }}</span>
+              <strong>{{ order.total | currency: 'USD' }}</strong>
             </div>
           } @empty {
-            <app-empty-state title="No seller orders" description="Orders containing your products will appear here." icon="0" />
+            <app-empty-state
+              title="No seller orders"
+              description="Orders containing your products will appear here."
+              icon="0"
+            />
           }
         </article>
         <form class="form-card" [formGroup]="shipmentForm" (ngSubmit)="updateShipment()">
@@ -39,7 +50,8 @@ import { SellerDashboard } from '../../shared/models/api.models';
           <label>Carrier <input formControlName="carrier" /></label>
           <label>Tracking number <input formControlName="trackingNumber" /></label>
           <label>Tracking URL <input formControlName="trackingUrl" /></label>
-          <label>Status
+          <label
+            >Status
             <select formControlName="status">
               <option value="label_created">Label created</option>
               <option value="in_transit">In transit</option>
@@ -47,7 +59,9 @@ import { SellerDashboard } from '../../shared/models/api.models';
               <option value="failed">Failed</option>
             </select>
           </label>
-          <button class="button primary wide" type="submit" [disabled]="shipmentForm.invalid">Save shipment</button>
+          <button class="button primary wide" type="submit" [disabled]="shipmentForm.invalid">
+            Save shipment
+          </button>
         </form>
       </section>
     }

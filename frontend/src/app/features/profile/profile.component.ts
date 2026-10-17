@@ -1,5 +1,5 @@
 import { JsonPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ProfileApiService } from '../../core/api/domain-api.services';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/components/toast.service';
@@ -7,6 +7,7 @@ import { ToastService } from '../../shared/components/toast.service';
 @Component({
   selector: 'app-profile',
   imports: [JsonPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="page-header">
       <p class="eyebrow">Account</p>

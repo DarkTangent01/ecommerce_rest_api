@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
@@ -36,6 +36,7 @@ import { CartStateService } from '../cart/cart-state.service';
     LucideLogOut,
     LucideSearch,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <header class="topbar">
       <div class="topbar-main">

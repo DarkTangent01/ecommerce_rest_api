@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -8,26 +8,39 @@ import { ToastService } from '../../shared/components/toast.service';
 @Component({
   selector: 'app-login',
   imports: [ReactiveFormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="auth-page">
       <div class="auth-panel">
         <p class="eyebrow">Welcome back</p>
         <h1>Sign in to continue shopping.</h1>
-        <p class="muted">Access your cart, wishlist, order history, and role-aware seller/admin tools.</p>
+        <p class="muted">
+          Access your cart, wishlist, order history, and role-aware seller/admin tools.
+        </p>
         <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-          <label>Email
+          <label
+            >Email
             <input formControlName="email" type="email" autocomplete="email" />
             @if (form.controls.email.touched && form.controls.email.invalid) {
               <small class="field-error">Enter a valid email.</small>
             }
           </label>
-          <label>Password
+          <label
+            >Password
             <span class="password-wrap">
-              <input formControlName="password" [type]="showPassword() ? 'text' : 'password'" autocomplete="current-password" />
-              <button type="button" (click)="showPassword.set(!showPassword())">{{ showPassword() ? 'Hide' : 'Show' }}</button>
+              <input
+                formControlName="password"
+                [type]="showPassword() ? 'text' : 'password'"
+                autocomplete="current-password"
+              />
+              <button type="button" (click)="showPassword.set(!showPassword())">
+                {{ showPassword() ? 'Hide' : 'Show' }}
+              </button>
             </span>
           </label>
-          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">{{ loading ? 'Signing in...' : 'Log in' }}</button>
+          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">
+            {{ loading ? 'Signing in...' : 'Log in' }}
+          </button>
         </form>
         <p class="muted">New here? <a routerLink="/register">Create an account</a></p>
       </div>

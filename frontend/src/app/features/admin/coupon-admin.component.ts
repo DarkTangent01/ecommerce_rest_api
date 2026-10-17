@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CouponApiService } from '../../core/api/domain-api.services';
 import { ToastService } from '../../shared/components/toast.service';
@@ -8,6 +8,7 @@ import { Coupon } from '../../shared/models/api.models';
 @Component({
   selector: 'app-coupon-admin',
   imports: [DatePipe, ReactiveFormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="page-header">
       <p class="eyebrow">Admin</p>
@@ -16,7 +17,8 @@ import { Coupon } from '../../shared/models/api.models';
     <section class="checkout-layout">
       <form class="form-card" [formGroup]="form" (ngSubmit)="create()">
         <label>Code <input formControlName="code" /></label>
-        <label>Type
+        <label
+          >Type
           <select formControlName="type">
             <option value="percentage">Percentage</option>
             <option value="fixed">Fixed</option>
@@ -26,7 +28,9 @@ import { Coupon } from '../../shared/models/api.models';
         <label>Minimum order <input formControlName="minOrderTotal" type="number" /></label>
         <label>Usage limit <input formControlName="usageLimit" type="number" /></label>
         <label>Per-user limit <input formControlName="perUserLimit" type="number" /></label>
-        <button class="button primary wide" [disabled]="form.invalid" type="submit">Create coupon</button>
+        <button class="button primary wide" [disabled]="form.invalid" type="submit">
+          Create coupon
+        </button>
       </form>
       <div class="table-card">
         @for (coupon of coupons(); track coupon._id) {
@@ -34,7 +38,7 @@ import { Coupon } from '../../shared/models/api.models';
             <span>{{ coupon.code }}</span>
             <span>{{ coupon.type }} {{ coupon.value }}</span>
             <span>{{ coupon.usedCount || 0 }}/{{ coupon.usageLimit }}</span>
-            <span>{{ coupon.expiresAt | date:'mediumDate' }}</span>
+            <span>{{ coupon.expiresAt | date: 'mediumDate' }}</span>
           </div>
         }
       </div>
@@ -65,7 +69,15 @@ export class CouponAdminComponent {
     this.api.create(this.form.getRawValue()).subscribe({
       next: () => {
         this.toast.show('Coupon created', 'success');
-        this.form.reset({ code: '', type: 'percentage', value: 10, minOrderTotal: 0, usageLimit: 100, perUserLimit: 1, isActive: true });
+        this.form.reset({
+          code: '',
+          type: 'percentage',
+          value: 10,
+          minOrderTotal: 0,
+          usageLimit: 100,
+          perUserLimit: 1,
+          isActive: true,
+        });
         this.load();
       },
       error: (err) => this.toast.show(err.error?.message ?? 'Coupon create failed', 'error'),

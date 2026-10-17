@@ -1,7 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { CartApiService, ProductApiService, WishlistApiService } from '../../core/api/domain-api.services';
+import {
+  CartApiService,
+  ProductApiService,
+  WishlistApiService,
+} from '../../core/api/domain-api.services';
 import { CartStateService } from '../../core/cart/cart-state.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { ProductCardComponent } from '../../shared/components/product-card.component';
@@ -11,7 +15,14 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
 
 @Component({
   selector: 'app-product-list',
-  imports: [ReactiveFormsModule, RouterLink, EmptyStateComponent, SkeletonComponent, ProductCardComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    EmptyStateComponent,
+    SkeletonComponent,
+    ProductCardComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="catalog-hero">
       <div>
@@ -27,7 +38,8 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
         <form [formGroup]="filters" (ngSubmit)="applyFilters()">
           <h2>Filters</h2>
           <label>Search <input formControlName="q" placeholder="Shoes, phone, decor" /></label>
-          <label>Category
+          <label
+            >Category
             <select formControlName="category">
               <option value="">All categories</option>
               @for (category of categories; track category) {
@@ -36,10 +48,15 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
             </select>
           </label>
           <div class="filter-pair">
-            <label>Min price <input formControlName="minPrice" type="number" placeholder="0" /></label>
-            <label>Max price <input formControlName="maxPrice" type="number" placeholder="500" /></label>
+            <label
+              >Min price <input formControlName="minPrice" type="number" placeholder="0"
+            /></label>
+            <label
+              >Max price <input formControlName="maxPrice" type="number" placeholder="500"
+            /></label>
           </div>
-          <label>Rating
+          <label
+            >Rating
             <select formControlName="rating">
               <option value="">Any rating</option>
               <option value="4">4 stars and above</option>
@@ -58,7 +75,8 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
             <strong>{{ meta()?.total || visibleProducts().length }} results</strong>
             <span>Page {{ meta()?.page || 1 }} of {{ meta()?.pages || 1 }}</span>
           </div>
-          <label>Sort
+          <label
+            >Sort
             <select [value]="sort()" (change)="sort.set($any($event.target).value); applyFilters()">
               <option value="createdAt:desc">Newest</option>
               <option value="price:asc">Price: Low to High</option>
@@ -74,16 +92,36 @@ import { PaginationMeta, Product } from '../../shared/models/api.models';
         } @else {
           <div class="product-grid">
             @for (product of visibleProducts(); track product._id) {
-              <app-product-card [product]="product" (addToCart)="addToCart($event)" (save)="wishlist($event._id)" />
+              <app-product-card
+                [product]="product"
+                (addToCart)="addToCart($event)"
+                (save)="wishlist($event._id)"
+              />
             } @empty {
-              <app-empty-state title="No matching products" description="Try adjusting search, category, rating, or price filters." icon="0" />
+              <app-empty-state
+                title="No matching products"
+                description="Try adjusting search, category, rating, or price filters."
+                icon="0"
+              />
             }
           </div>
           @if (meta()) {
             <div class="pagination">
-              <button class="button ghost" [disabled]="page() <= 1" (click)="page.set(page() - 1); load()">Previous</button>
+              <button
+                class="button ghost"
+                [disabled]="page() <= 1"
+                (click)="page.set(page() - 1); load()"
+              >
+                Previous
+              </button>
               <span>Page {{ meta()?.page }} of {{ meta()?.pages || 1 }}</span>
-              <button class="button ghost" [disabled]="page() >= (meta()?.pages || 1)" (click)="page.set(page() + 1); load()">Next</button>
+              <button
+                class="button ghost"
+                [disabled]="page() >= (meta()?.pages || 1)"
+                (click)="page.set(page() + 1); load()"
+              >
+                Next
+              </button>
             </div>
           }
         }
@@ -107,7 +145,13 @@ export class ProductListComponent {
   readonly page = signal(1);
   readonly sort = signal('createdAt:desc');
   readonly categories = ['Fashion', 'Electronics', 'Home', 'Beauty', 'Sports'];
-  readonly filters = this.fb.nonNullable.group({ q: '', category: '', minPrice: '', maxPrice: '', rating: '' });
+  readonly filters = this.fb.nonNullable.group({
+    q: '',
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    rating: '',
+  });
 
   constructor() {
     this.route.queryParams.subscribe((params) => {
@@ -156,7 +200,11 @@ export class ProductListComponent {
       next: (res) => {
         this.products.set(res.data);
         const minRating = Number(rating) || 0;
-        this.visibleProducts.set(minRating ? res.data.filter((product) => (product.ratingAverage || 0) >= minRating) : res.data);
+        this.visibleProducts.set(
+          minRating
+            ? res.data.filter((product) => (product.ratingAverage || 0) >= minRating)
+            : res.data,
+        );
         this.meta.set(res.meta as PaginationMeta);
         this.loading.set(false);
       },
@@ -170,14 +218,16 @@ export class ProductListComponent {
         this.cartState.set(cart);
         this.toast.show('Added to cart', 'success');
       },
-      error: (err) => this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
+      error: (err) =>
+        this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
     });
   }
 
   wishlist(productId: string): void {
     this.wishlistApi.add(productId).subscribe({
       next: () => this.toast.show('Added to wishlist', 'success'),
-      error: (err) => this.toast.show(err.error?.message ?? 'Login required to save wishlist items', 'error'),
+      error: (err) =>
+        this.toast.show(err.error?.message ?? 'Login required to save wishlist items', 'error'),
     });
   }
 }

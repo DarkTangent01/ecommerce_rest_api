@@ -1,7 +1,8 @@
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 
 @Component({
   selector: 'app-skeleton',
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="skeleton-grid">
       @for (item of rows(); track item) {

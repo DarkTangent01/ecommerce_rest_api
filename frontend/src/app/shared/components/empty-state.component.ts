@@ -1,7 +1,8 @@
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 
 @Component({
   selector: 'app-empty-state',
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="empty-state">
       <div class="empty-icon">{{ icon() }}</div>

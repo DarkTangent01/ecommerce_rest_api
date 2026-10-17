@@ -1,9 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 
 @Component({
   selector: 'app-notifications',
   imports: [EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="page-header">
       <p class="eyebrow">Notifications</p>

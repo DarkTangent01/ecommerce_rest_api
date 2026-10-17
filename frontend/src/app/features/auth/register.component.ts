@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -8,6 +8,7 @@ import { ToastService } from '../../shared/components/toast.service';
 @Component({
   selector: 'app-register',
   imports: [ReactiveFormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="auth-page">
       <div class="auth-panel">
@@ -17,15 +18,30 @@ import { ToastService } from '../../shared/components/toast.service';
         <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
           <label>Name <input formControlName="name" autocomplete="name" /></label>
           <label>Email <input formControlName="email" type="email" autocomplete="email" /></label>
-          <label>Password
+          <label
+            >Password
             <span class="password-wrap">
-              <input formControlName="password" [type]="showPassword() ? 'text' : 'password'" autocomplete="new-password" />
-              <button type="button" (click)="showPassword.set(!showPassword())">{{ showPassword() ? 'Hide' : 'Show' }}</button>
+              <input
+                formControlName="password"
+                [type]="showPassword() ? 'text' : 'password'"
+                autocomplete="new-password"
+              />
+              <button type="button" (click)="showPassword.set(!showPassword())">
+                {{ showPassword() ? 'Hide' : 'Show' }}
+              </button>
             </span>
             <small>Password must include uppercase, lowercase, and a number.</small>
           </label>
-          <label>Repeat password <input formControlName="repeat_password" [type]="showPassword() ? 'text' : 'password'" autocomplete="new-password" /></label>
-          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">{{ loading ? 'Creating...' : 'Register' }}</button>
+          <label
+            >Repeat password
+            <input
+              formControlName="repeat_password"
+              [type]="showPassword() ? 'text' : 'password'"
+              autocomplete="new-password"
+          /></label>
+          <button class="button primary wide" [disabled]="form.invalid || loading" type="submit">
+            {{ loading ? 'Creating...' : 'Register' }}
+          </button>
         </form>
         <p class="muted">Already have an account? <a routerLink="/login">Log in</a></p>
       </div>
@@ -49,7 +65,10 @@ export class RegisterComponent {
 
   submit(): void {
     if (this.form.invalid || this.form.value.password !== this.form.value.repeat_password) {
-      this.toast.show('Passwords must match and include uppercase, lowercase, and a number.', 'error');
+      this.toast.show(
+        'Passwords must match and include uppercase, lowercase, and a number.',
+        'error',
+      );
       return;
     }
     this.loading = true;

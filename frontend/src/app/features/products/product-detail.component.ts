@@ -1,8 +1,13 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CartApiService, ProductApiService, ReviewApiService, WishlistApiService } from '../../core/api/domain-api.services';
+import {
+  CartApiService,
+  ProductApiService,
+  ReviewApiService,
+  WishlistApiService,
+} from '../../core/api/domain-api.services';
 import { CartStateService } from '../../core/cart/cart-state.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { ProductCardComponent } from '../../shared/components/product-card.component';
@@ -12,15 +17,26 @@ import { Product, Review } from '../../shared/models/api.models';
 
 @Component({
   selector: 'app-product-detail',
-  imports: [CurrencyPipe, ReactiveFormsModule, EmptyStateComponent, RatingStarsComponent, ProductCardComponent],
+  imports: [
+    CurrencyPipe,
+    ReactiveFormsModule,
+    EmptyStateComponent,
+    RatingStarsComponent,
+    ProductCardComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     @if (product(); as item) {
       <section class="product-detail">
         <div class="gallery">
           <div class="thumb-list">
-            <button class="thumb active" type="button"><img [src]="item.image" [alt]="item.name" /></button>
+            <button class="thumb active" type="button">
+              <img [src]="item.image" [alt]="item.name" />
+            </button>
             @for (variant of item.variants || []; track variant.sku) {
-              <button class="thumb" type="button">{{ variant.color || variant.size || 'SKU' }}</button>
+              <button class="thumb" type="button">
+                {{ variant.color || variant.size || 'SKU' }}
+              </button>
             }
           </div>
           <div class="main-image">
@@ -33,7 +49,11 @@ import { Product, Review } from '../../shared/models/api.models';
           <p class="shop-card-category">{{ item.category || 'Essentials' }}</p>
           <h1>{{ item.name }}</h1>
           <app-rating-stars [value]="item.ratingAverage || 0" [count]="item.ratingCount || 0" />
-          <p class="detail-copy">{{ item.description || 'A carefully selected catalog item ready for your ecommerce flow.' }}</p>
+          <p class="detail-copy">
+            {{
+              item.description || 'A carefully selected catalog item ready for your ecommerce flow.'
+            }}
+          </p>
 
           <div class="detail-price">
             <strong>{{ item.price | currency: 'USD' }}</strong>
@@ -48,15 +68,32 @@ import { Product, Review } from '../../shared/models/api.models';
           <form [formGroup]="cartForm" class="purchase-panel">
             <label>Quantity <input type="number" min="1" formControlName="quantity" /></label>
             <div class="purchase-actions">
-              <button class="button primary" type="button" [disabled]="item.stock <= 0" (click)="addToCart()">Add to cart</button>
-              <button class="button buy-now" type="button" [disabled]="item.stock <= 0" (click)="buyNow()">Buy now</button>
+              <button
+                class="button primary"
+                type="button"
+                [disabled]="item.stock <= 0"
+                (click)="addToCart()"
+              >
+                Add to cart
+              </button>
+              <button
+                class="button buy-now"
+                type="button"
+                [disabled]="item.stock <= 0"
+                (click)="buyNow()"
+              >
+                Buy now
+              </button>
               <button class="button ghost" type="button" (click)="save()">Wishlist</button>
             </div>
           </form>
 
           <div class="delivery-card">
             <strong>Delivery and buyer protection</strong>
-            <span>Secure order creation, stock reservation, coupon support, and order tracking are handled by the backend.</span>
+            <span
+              >Secure order creation, stock reservation, coupon support, and order tracking are
+              handled by the backend.</span
+            >
           </div>
         </div>
       </section>
@@ -73,14 +110,19 @@ import { Product, Review } from '../../shared/models/api.models';
                 <small>{{ review.user?.name || 'Verified customer' }}</small>
               </article>
             } @empty {
-              <app-empty-state title="No reviews yet" description="Reviews require a verified purchase in the backend." icon="0" />
+              <app-empty-state
+                title="No reviews yet"
+                description="Reviews require a verified purchase in the backend."
+                icon="0"
+              />
             }
           </div>
         </article>
 
         <form class="form-card" [formGroup]="reviewForm" (ngSubmit)="submitReview()">
           <h2>Add a review</h2>
-          <label>Rating
+          <label
+            >Rating
             <select formControlName="rating">
               <option [value]="5">5 stars</option>
               <option [value]="4">4 stars</option>
@@ -90,8 +132,16 @@ import { Product, Review } from '../../shared/models/api.models';
             </select>
           </label>
           <label>Title <input formControlName="title" placeholder="Great quality" /></label>
-          <label>Comment <textarea formControlName="comment" placeholder="Share your product experience"></textarea></label>
-          <button class="button primary wide" type="submit" [disabled]="reviewForm.invalid">Submit review</button>
+          <label
+            >Comment
+            <textarea
+              formControlName="comment"
+              placeholder="Share your product experience"
+            ></textarea>
+          </label>
+          <button class="button primary wide" type="submit" [disabled]="reviewForm.invalid">
+            Submit review
+          </button>
           <p class="muted">The API accepts reviews only from verified purchasers.</p>
         </form>
       </section>
@@ -105,7 +155,11 @@ import { Product, Review } from '../../shared/models/api.models';
         </div>
         <div class="product-grid">
           @for (related of relatedProducts(); track related._id) {
-            <app-product-card [product]="related" (addToCart)="addToCartProduct($event)" (save)="saveProduct($event)" />
+            <app-product-card
+              [product]="related"
+              (addToCart)="addToCartProduct($event)"
+              (save)="saveProduct($event)"
+            />
           }
         </div>
       </section>
@@ -125,7 +179,9 @@ export class ProductDetailComponent {
   readonly product = signal<Product | null>(null);
   readonly relatedProducts = signal<Product[]>([]);
   readonly reviews = signal<Review[]>([]);
-  readonly cartForm = this.fb.nonNullable.group({ quantity: [1, [Validators.required, Validators.min(1)]] });
+  readonly cartForm = this.fb.nonNullable.group({
+    quantity: [1, [Validators.required, Validators.min(1)]],
+  });
   readonly reviewForm = this.fb.nonNullable.group({
     rating: [5, [Validators.required, Validators.min(1), Validators.max(5)]],
     title: [''],
@@ -138,9 +194,17 @@ export class ProductDetailComponent {
       this.product.set(product);
       this.productsApi
         .list({ category: product.category || '', limit: 4 })
-        .subscribe({ next: (res) => this.relatedProducts.set(res.data.filter((item) => item._id !== id)), error: () => undefined });
+        .subscribe({
+          next: (res) => this.relatedProducts.set(res.data.filter((item) => item._id !== id)),
+          error: () => undefined,
+        });
     });
-    this.reviewsApi.list(id).subscribe({ next: (reviews) => this.reviews.set(reviews), error: () => this.reviews.set([]) });
+    this.reviewsApi
+      .list(id)
+      .subscribe({
+        next: (reviews) => this.reviews.set(reviews),
+        error: () => this.reviews.set([]),
+      });
   }
 
   discount(product: Product): number {
@@ -166,7 +230,11 @@ export class ProductDetailComponent {
   buyNow(): void {
     const item = this.product();
     if (!item) return;
-    this.addToCartProduct(item, this.cartForm.getRawValue().quantity, () => void this.router.navigateByUrl('/checkout'));
+    this.addToCartProduct(
+      item,
+      this.cartForm.getRawValue().quantity,
+      () => void this.router.navigateByUrl('/checkout'),
+    );
   }
 
   addToCartProduct(product: Product, quantity = 1, after?: () => void): void {
@@ -176,7 +244,8 @@ export class ProductDetailComponent {
         this.toast.show('Added to cart', 'success');
         after?.();
       },
-      error: (err) => this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
+      error: (err) =>
+        this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
     });
   }
 
@@ -201,7 +270,8 @@ export class ProductDetailComponent {
         this.reviewForm.reset({ rating: 5, title: '', comment: '' });
         this.toast.show('Review saved', 'success');
       },
-      error: (err) => this.toast.show(err.error?.message ?? 'Review requires a verified purchase', 'error'),
+      error: (err) =>
+        this.toast.show(err.error?.message ?? 'Review requires a verified purchase', 'error'),
     });
   }
 }

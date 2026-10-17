@@ -1,6 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CartApiService, ProductApiService, WishlistApiService } from '../../core/api/domain-api.services';
+import {
+  CartApiService,
+  ProductApiService,
+  WishlistApiService,
+} from '../../core/api/domain-api.services';
 import { Product } from '../../shared/models/api.models';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { ProductCardComponent } from '../../shared/components/product-card.component';
@@ -10,15 +14,24 @@ import { CartStateService } from '../../core/cart/cart-state.service';
 @Component({
   selector: 'app-home',
   imports: [RouterLink, EmptyStateComponent, ProductCardComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="store-hero">
       <div class="store-hero-copy">
         <p class="eyebrow">Big brand energy, real backend data</p>
         <h1>Upgrade your cart with fresh drops, daily deals, and fast checkout.</h1>
-        <p>Search products, save favorites, checkout securely, and track every order from one responsive storefront.</p>
+        <p>
+          Search products, save favorites, checkout securely, and track every order from one
+          responsive storefront.
+        </p>
         <div class="hero-actions">
           <a class="button primary" routerLink="/products">Shop now</a>
-          <a class="button ghost" routerLink="/products" [queryParams]="{ sortBy: 'price', order: 'asc' }">View deals</a>
+          <a
+            class="button ghost"
+            routerLink="/products"
+            [queryParams]="{ sortBy: 'price', order: 'asc' }"
+            >View deals</a
+          >
         </div>
       </div>
       <div class="store-hero-card">
@@ -59,9 +72,17 @@ import { CartStateService } from '../../core/cart/cart-state.service';
       </div>
       <div class="product-grid">
         @for (product of products(); track product._id) {
-          <app-product-card [product]="product" (addToCart)="addToCart($event)" (save)="save($event)" />
+          <app-product-card
+            [product]="product"
+            (addToCart)="addToCart($event)"
+            (save)="save($event)"
+          />
         } @empty {
-          <app-empty-state title="No products yet" description="Create products as an admin or seller and they will appear here." icon="+" />
+          <app-empty-state
+            title="No products yet"
+            description="Create products as an admin or seller and they will appear here."
+            icon="+"
+          />
         }
       </div>
     </section>
@@ -71,13 +92,25 @@ import { CartStateService } from '../../core/cart/cart-state.service';
         <p class="eyebrow">New arrivals</p>
         <h2>Fresh styles just landed</h2>
         <p>Sort by newest and discover the latest products your sellers have added.</p>
-        <a class="button primary" routerLink="/products" [queryParams]="{ sortBy: 'createdAt', order: 'desc' }">See new arrivals</a>
+        <a
+          class="button primary"
+          routerLink="/products"
+          [queryParams]="{ sortBy: 'createdAt', order: 'desc' }"
+          >See new arrivals</a
+        >
       </div>
       <div>
         <p class="eyebrow">Best sellers</p>
         <h2>Customer favorites</h2>
-        <p>Products with strong ratings and steady stock get surfaced for quick buying decisions.</p>
-        <a class="button ghost" routerLink="/products" [queryParams]="{ sortBy: 'name', order: 'asc' }">Browse best sellers</a>
+        <p>
+          Products with strong ratings and steady stock get surfaced for quick buying decisions.
+        </p>
+        <a
+          class="button ghost"
+          routerLink="/products"
+          [queryParams]="{ sortBy: 'name', order: 'asc' }"
+          >Browse best sellers</a
+        >
       </div>
     </section>
 
@@ -105,9 +138,24 @@ export class HomeComponent {
     { name: 'Sports', short: '05', copy: 'Performance gear' },
   ];
   readonly deals = [
-    { kicker: 'Deal of the day', title: 'Price drops under $50', copy: 'Filter budget-friendly picks instantly.', query: { maxPrice: 50 } },
-    { kicker: 'Limited stock', title: 'Almost gone', copy: 'Shop before low-stock products sell out.', query: { sortBy: 'stock', order: 'asc' } },
-    { kicker: 'Top rated', title: 'Loved by shoppers', copy: 'Find catalog items with the strongest ratings.', query: { sortBy: 'name' } },
+    {
+      kicker: 'Deal of the day',
+      title: 'Price drops under $50',
+      copy: 'Filter budget-friendly picks instantly.',
+      query: { maxPrice: 50 },
+    },
+    {
+      kicker: 'Limited stock',
+      title: 'Almost gone',
+      copy: 'Shop before low-stock products sell out.',
+      query: { sortBy: 'stock', order: 'asc' },
+    },
+    {
+      kicker: 'Top rated',
+      title: 'Loved by shoppers',
+      copy: 'Find catalog items with the strongest ratings.',
+      query: { sortBy: 'name' },
+    },
   ];
   readonly trustBadges = [
     { title: 'Secure checkout', copy: 'JWT protected and idempotent order creation' },
@@ -119,7 +167,10 @@ export class HomeComponent {
   constructor() {
     inject(ProductApiService)
       .list({ limit: 8 })
-      .subscribe({ next: (res) => this.products.set(res.data), error: () => this.products.set([]) });
+      .subscribe({
+        next: (res) => this.products.set(res.data),
+        error: () => this.products.set([]),
+      });
   }
 
   addToCart(product: Product): void {
@@ -128,7 +179,8 @@ export class HomeComponent {
         this.cartState.set(cart);
         this.toast.show('Added to cart', 'success');
       },
-      error: (err) => this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
+      error: (err) =>
+        this.toast.show(err.error?.message ?? 'Login to add products to cart', 'error'),
     });
   }
 

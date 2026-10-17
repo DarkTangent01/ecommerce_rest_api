@@ -1,9 +1,10 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 
 @Component({
   selector: 'app-rating-stars',
   imports: [DecimalPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <span class="rating-stars" [attr.aria-label]="value() + ' out of 5 stars'">
       <span>{{ stars() }}</span>

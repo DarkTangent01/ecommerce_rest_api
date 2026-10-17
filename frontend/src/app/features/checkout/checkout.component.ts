@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CartApiService, OrderApiService } from '../../core/api/domain-api.services';
@@ -10,6 +10,7 @@ import { Cart, Product } from '../../shared/models/api.models';
 @Component({
   selector: 'app-checkout',
   imports: [CurrencyPipe, ReactiveFormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <section class="checkout-page">
       <div class="checkout-main">
@@ -74,10 +75,16 @@ import { Cart, Product } from '../../shared/models/api.models';
             <strong>{{ productOf(item.product).price * item.quantity | currency: 'USD' }}</strong>
           </div>
         }
-        <div class="summary-line"><span>Subtotal</span><strong>{{ total() | currency: 'USD' }}</strong></div>
+        <div class="summary-line">
+          <span>Subtotal</span><strong>{{ total() | currency: 'USD' }}</strong>
+        </div>
         <div class="summary-line"><span>Delivery</span><strong>Free</strong></div>
-        <div class="summary-total"><span>Payable now</span><strong>{{ total() | currency: 'USD' }}</strong></div>
-        <p class="muted">Checkout sends a client-generated idempotency key required by the backend.</p>
+        <div class="summary-total">
+          <span>Payable now</span><strong>{{ total() | currency: 'USD' }}</strong>
+        </div>
+        <p class="muted">
+          Checkout sends a client-generated idempotency key required by the backend.
+        </p>
       </aside>
     </section>
   `,
