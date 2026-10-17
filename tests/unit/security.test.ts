@@ -137,6 +137,13 @@ describe("SSRF and upload guards", () => {
     expect(() => assertSafeExternalUrl("https://example.com/tracking")).not.toThrow();
   });
 
+  it("accepts a genuine JPEG whose bytes happen to contain 'MZ'", async () => {
+    const tmpFile = path.join(os.tmpdir(), `mz-jpeg-${Date.now()}.jpg`);
+    fs.writeFileSync(tmpFile, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from("....MZ...."), Buffer.from([0xff, 0xd9])]));
+    await expect(assertSafeImage({ path: tmpFile })).resolves.toBeUndefined();
+    fs.rmSync(tmpFile, { force: true });
+  });
+
   it("rejects executables disguised as images", async () => {
     const tmpFile = path.join(os.tmpdir(), `unsafe-upload-${Date.now()}.jpg`);
     fs.writeFileSync(tmpFile, Buffer.from("MZ fake executable"));

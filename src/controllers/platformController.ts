@@ -175,6 +175,13 @@ class PlatformController {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.write(`event: connected\ndata: ${JSON.stringify({ requestId: req.requestId, tenant: req.tenant })}\n\n`);
+    // Keep proxies from timing the stream out, and release the socket when the client leaves.
+    const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), 25_000);
+    heartbeat.unref();
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      res.end();
+    });
   }
 }
 

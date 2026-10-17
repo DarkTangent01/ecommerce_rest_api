@@ -51,7 +51,9 @@ export const assertSafeImage = async (file: Pick<Express.Multer.File, "path">) =
   const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
   const isPng = head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const isWebp = head.subarray(0, 4).toString() === "RIFF" && buffer.subarray(8, 12).toString() === "WEBP";
-  const executableMarkers = ["mz", "<script", "<html", "<?php", "#!/"];
+  // A PE executable ("MZ") cannot also start with an image signature, so it is already rejected by
+  // the magic-byte check; searching for "mz" anywhere rejected genuine images containing those bytes.
+  const executableMarkers = ["<script", "<html", "<?php", "#!/"];
   const hasExecutableMarker = executableMarkers.some((marker) => asciiHead.includes(marker));
   const hasZipMarker = buffer.includes(Buffer.from("PK\u0003\u0004"));
 
@@ -165,8 +167,9 @@ class ProductController {
     try {
       const { data, meta } = await this.productService.list({ query: req.query, tenant: req.tenant });
       return successResponse(res, data, "Products fetched", 200, meta);
-    } catch {
-      return next(CustomeErrorHandler.serverError());
+    } catch (err) {
+      // Let the central handler pick the status (e.g. 400 for a bad cursor) and log the cause.
+      return next(err);
     }
   }
 
