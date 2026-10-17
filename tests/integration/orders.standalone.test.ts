@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { InventoryReservation, Order, Product } from "../../src/models/index.js";
+import { InventoryReservation, Order, PaymentEvent, Product } from "../../src/models/index.js";
+import { sendWebhook } from "../helpers/webhooks.js";
 import { clearDb, startDb, stopDb } from "../helpers/db.js";
 import { addToCart, api, checkout, createProduct, createUser } from "../helpers/factories.js";
 
@@ -34,6 +35,19 @@ describe("checkout without transactions", () => {
     expect(await Order.countDocuments()).toBe(0);
     // The cart is untouched so the user can fix it and retry.
     expect((await api().get("/api/cart").set(auth)).body.data.items).toHaveLength(2);
+  });
+});
+
+describe("payment webhook without transactions (audit H6)", () => {
+  it("confirms the order and records the event exactly once", async () => {
+    const { auth } = await createUser();
+    await addToCart(auth, (await createProduct())._id);
+    const orderId = (await checkout(auth)).body.data._id as string;
+
+    expect((await sendWebhook({ orderId, type: "payment.succeeded" }, { eventId: "evt_sa" })).status).toBe(200);
+    expect((await sendWebhook({ orderId, type: "payment.succeeded" }, { eventId: "evt_sa" })).body.data).toEqual({ replay: true });
+    expect(await Order.findById(orderId)).toMatchObject({ paymentStatus: "paid", status: "confirmed" });
+    expect(await PaymentEvent.countDocuments({ eventId: "evt_sa" })).toBe(1);
   });
 });
 

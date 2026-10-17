@@ -1,14 +1,19 @@
 import crypto from "crypto";
 import type { Request } from "express";
-import type { Types } from "mongoose";
+import { z } from "zod";
 import { CustomeErrorHandler } from "./index.js";
-import { applyPaymentTransition, assertPaymentTransition } from "./paymentStateMachine.js";
+import { assertPaymentTransition } from "./paymentStateMachine.js";
+import { releaseOrderReservations } from "./inventoryService.js";
+import { recordSecuritySignal } from "./securityService.js";
 import PaymentRepository from "../repositories/PaymentRepository.js";
+import { runInTransaction } from "../infrastructure/database/transaction.js";
 import { verifyWebhookSignature } from "../utils/webhook.js";
 import auditLogger from "../utils/auditLogger.js";
+import { logEvent } from "../utils/requestContext.js";
 import { publishEvent } from "../infra/events/eventBus.js";
 import { emitAlert } from "../observability/metrics.js";
-import type { PaymentStatus } from "../types/domain.js";
+import { objectIdString, validate } from "../validators/common.js";
+import type { Order, PaymentStatus } from "../types/domain.js";
 
 export interface WebhookHeaders {
   signature?: string;
@@ -17,11 +22,22 @@ export interface WebhookHeaders {
   eventId?: string;
 }
 
-export interface WebhookBody {
-  orderId?: string;
-  type?: string;
-  paymentReference?: string;
-}
+export const webhookBodySchema = z.object({
+  orderId: objectIdString(),
+  type: z.enum(["payment.succeeded", "payment.failed", "payment.refunded"]),
+  paymentReference: z.string().trim().max(160).optional(),
+});
+
+export type WebhookBody = z.input<typeof webhookBodySchema>;
+
+const TARGET_STATE: Record<z.infer<typeof webhookBodySchema>["type"], PaymentStatus> = {
+  "payment.succeeded": "paid",
+  "payment.failed": "failed",
+  "payment.refunded": "refunded",
+};
+
+const nextOrderStatus = (order: Pick<Order, "status">, to: PaymentStatus): Order["status"] =>
+  to === "paid" && order.status === "pending" ? "confirmed" : order.status;
 
 class PaymentService {
   repository: PaymentRepository;
@@ -35,30 +51,14 @@ class PaymentService {
   }
 
   targetStateForEvent(type: string | undefined): PaymentStatus | null {
-    const states: Record<string, PaymentStatus> = {
-      "payment.succeeded": "paid",
-      "payment.failed": "failed",
-      "payment.refunded": "refunded",
-    };
-    return (type && states[type]) || null;
+    return (type && TARGET_STATE[type as keyof typeof TARGET_STATE]) || null;
   }
 
   verifyWebhook({ rawPayload, signature, timestamp }: { rawPayload: string; signature?: string; timestamp?: string }) {
     verifyWebhookSignature(rawPayload, signature, timestamp);
   }
 
-  async releaseReservations(orderId: Types.ObjectId) {
-    const reservations = await this.repository.findActiveReservations(orderId);
-    for (const reservation of reservations) {
-      await this.repository.restoreProductStock(reservation.product, reservation.quantity);
-      reservation.status = "released";
-      await this.repository.saveReservation(reservation);
-    }
-  }
-
-  async processWebhook({ headers, body, rawPayload, req }: { headers: WebhookHeaders; body: WebhookBody; rawPayload: string; req: Partial<Request> }) {
-    const signature = headers.signature;
-    const timestamp = headers.timestamp;
+  async processWebhook({ headers, body, rawPayload, req }: { headers: WebhookHeaders; body: unknown; rawPayload: string; req: Partial<Request> }) {
     const provider = headers.provider || "manual";
     const eventId = headers.eventId;
 
@@ -66,68 +66,93 @@ class PaymentService {
       throw CustomeErrorHandler.badRequest("Webhook event id is required");
     }
 
-    this.verifyWebhook({ rawPayload, signature, timestamp });
+    this.verifyWebhook({ rawPayload, signature: headers.signature, timestamp: headers.timestamp });
 
     const existing = await this.repository.findEvent(provider, eventId);
     if (existing) {
       return { replay: true as const };
     }
 
-    const { orderId, type, paymentReference } = body;
-    const order = orderId ? await this.repository.findOrderById(orderId) : null;
+    const { error, value } = validate(webhookBodySchema, body);
+    if (error) throw error;
+    const { orderId, type, paymentReference } = value;
+
+    const order = await this.repository.findOrderById(orderId);
     if (!order) {
       throw CustomeErrorHandler.notFound("Order not found");
     }
 
-    const targetState = this.targetStateForEvent(type);
-    if (!targetState || !type) {
-      throw CustomeErrorHandler.badRequest("Unsupported payment event");
+    const targetState = TARGET_STATE[type];
+
+    // A cancelled order has already returned its stock; confirming it would oversell. The money
+    // has to go back to the customer instead, so make it loud.
+    if (order.status === "cancelled" && (targetState === "paid" || targetState === "authorized")) {
+      await recordSecuritySignal({ type: "payment.on_cancelled_order", severity: "high", tenant: order.tenant, metadata: { order: order._id, provider, eventId } });
+      emitAlert("payment.on_cancelled_order", "high", { order: order._id, provider, eventId });
+      throw CustomeErrorHandler.conflict("Order is cancelled; payment must be refunded");
     }
 
     assertPaymentTransition(order.paymentStatus, targetState);
 
-    await this.repository.createEvent({
-      provider,
-      eventId,
-      order: order._id,
-      type,
-      payloadHash: this.hashPayload(rawPayload),
+    // The order transition, reservation changes and the event record commit together. Without
+    // transactions the compare-and-set on the order still lets only one webhook win, and the event
+    // is written last, so a failure before it lets the provider's retry re-run the whole step.
+    const { result: updated } = await runInTransaction(async (session) => {
+      let current = order;
+      if (order.paymentStatus !== targetState) {
+        const transitioned = await this.repository.transitionOrder(
+          {
+            orderId: order._id,
+            from: { paymentStatus: order.paymentStatus, status: order.status },
+            to: { paymentStatus: targetState, status: nextOrderStatus(order, targetState) },
+            reason: type,
+            provider,
+            paymentReference,
+          },
+          session
+        );
+        if (!transitioned) throw CustomeErrorHandler.conflict("Order changed while processing the payment; retry");
+        current = transitioned;
+      }
+
+      if (targetState === "paid") {
+        await this.repository.commitReservations(order._id, session);
+      } else {
+        await releaseOrderReservations(order._id, session);
+      }
+
+      await this.repository.createEvent({ provider, eventId, order: order._id, type, payloadHash: this.hashPayload(rawPayload) }, session);
+      return current;
     });
 
-    applyPaymentTransition(order, targetState, type);
-    order.paymentProvider = provider;
-    order.paymentReference = paymentReference || order.paymentReference;
-    await this.repository.saveOrder(order);
+    await this.afterWebhook(updated, targetState, { provider, eventId, type }, req);
+    return { order: updated };
+  }
 
-    if (targetState === "paid") {
-      await this.repository.commitReservations(order._id);
+  /** Notifications after the payment state is durable; failures are logged, not surfaced. */
+  private async afterWebhook(
+    order: Pick<Order, "_id" | "tenant">,
+    targetState: PaymentStatus,
+    meta: { provider: string; eventId: string; type: string },
+    req: Partial<Request>
+  ) {
+    try {
+      const eventType = targetState === "paid" ? "payment.completed" : targetState === "failed" ? "payment.failed" : "payment.refunded";
       await publishEvent({
-        type: "payment.completed",
+        type: eventType,
         aggregateType: "order",
         aggregateId: order._id,
         tenant: order.tenant,
-        payload: { orderId: order._id, provider, eventId },
-        req,
-      });
-    }
-
-    if (targetState === "failed" || targetState === "refunded") {
-      await this.releaseReservations(order._id);
-      await publishEvent({
-        type: targetState === "failed" ? "payment.failed" : "payment.refunded",
-        aggregateType: "order",
-        aggregateId: order._id,
-        tenant: order.tenant,
-        payload: { orderId: order._id, provider, eventId },
+        payload: { orderId: order._id, provider: meta.provider, eventId: meta.eventId },
         req,
       });
       if (targetState === "failed") {
-        emitAlert("payment.failed", "high", { order: order._id, provider, eventId });
+        emitAlert("payment.failed", "high", { order: order._id, provider: meta.provider, eventId: meta.eventId });
       }
+      auditLogger("payment.webhook", req, { order: order._id, ...meta });
+    } catch (err) {
+      logEvent("error", "payment.side_effects_failed", req, { order: order._id, error: (err as Error).message });
     }
-
-    auditLogger("payment.webhook", req, { order: order._id, provider, eventId, type });
-    return { order };
   }
 }
 

@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { successResponse } from "../utils/apiResponse.js";
-import PaymentService, { type WebhookBody } from "../services/PaymentService.js";
+import PaymentService from "../services/PaymentService.js";
 
 class PaymentController {
   paymentService: PaymentService;
@@ -19,7 +19,7 @@ class PaymentController {
           provider: req.get("X-Payment-Provider"),
           eventId: req.get("X-Webhook-Event-Id"),
         },
-        body: (req.body ?? {}) as WebhookBody,
+        body: req.body as unknown,
         rawPayload: req.rawBody || JSON.stringify(req.body || {}),
         req,
       });
