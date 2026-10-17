@@ -10,6 +10,8 @@ export type ProductInput = Partial<Pick<Product, "name" | "description" | "price
 
 type Actor = Pick<AuthUser, "_id" | "role">;
 
+const LIST_QUERY_KEYS = ["page", "limit", "cursor", "sortBy", "order", "category", "minPrice", "maxPrice", "q"] as const;
+
 class ProductService {
   repository: ProductRepository;
 
@@ -69,7 +71,10 @@ class ProductService {
   }
 
   async list({ query, tenant }: { query: QueryInput; tenant: string }) {
-    const cacheKey = `products:${tenant}:${JSON.stringify(query)}`;
+    // Only parameters that affect the result are part of the key, so junk parameters cannot
+    // mint unlimited cache entries.
+    const keyParams = Object.fromEntries(LIST_QUERY_KEYS.filter((key) => query[key] !== undefined).map((key) => [key, query[key]]));
+    const cacheKey = `products:${tenant}:${JSON.stringify(keyParams)}`;
     const cached = await cache.get<{ data: unknown[]; meta: Record<string, unknown> }>(cacheKey);
     if (cached) return cached;
 
@@ -79,10 +84,11 @@ class ProductService {
     const sort = buildSort(query.sortBy, query.order, ["name", "price", "createdAt", "stock"], "-createdAt");
     const filter: FilterQuery<Product> = { isActive: true, tenant, deletedAt: null, ...cursorPagination.cursorFilter };
 
-    if (query.category) {
-      // `category` is the one query key allowed to repeat (see preventParameterPollution).
-      filter.category = query.category as string | string[];
-    }
+    // `category` is the one query key allowed to repeat (see preventParameterPollution); an array
+    // used to become an exact-array match that never hit anything.
+    const categories = ([] as unknown[]).concat(query.category ?? []).filter((c): c is string => typeof c === "string" && c !== "");
+    if (categories.length === 1) filter.category = categories[0];
+    if (categories.length > 1) filter.category = { $in: categories };
     if (query.minPrice || query.maxPrice) {
       const minPrice = Number(query.minPrice);
       const maxPrice = Number(query.maxPrice);

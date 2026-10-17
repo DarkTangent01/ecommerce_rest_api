@@ -5,6 +5,7 @@ import { reviewSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import mongoose from "mongoose";
 import { assertAuthed } from "../types/http.js";
+import { buildPagination } from "../utils/pagination.js";
 
 const recalculateRating = async (productId: string) => {
   const stats = await Review.aggregate<{ average: number; count: number }>([
@@ -23,10 +24,14 @@ class ReviewController {
 
   async index(req: Request<{ productId: string }>, res: Response, next: NextFunction) {
     try {
-      const reviews = await Review.find({ product: req.params.productId, tenant: req.tenant, status: "published" })
-        .sort("-createdAt")
-        .populate("user", "name");
-      return successResponse(res, reviews, "Reviews fetched");
+      // Paginated (default 50, max 100): this list was unbounded.
+      const { page, limit, skip } = buildPagination(req.query, { limit: 50 });
+      const filter = { product: req.params.productId, tenant: req.tenant, status: "published" as const };
+      const [reviews, total] = await Promise.all([
+        Review.find(filter).sort("-createdAt").skip(skip).limit(limit).populate("user", "name"),
+        Review.countDocuments(filter),
+      ]);
+      return successResponse(res, reviews, "Reviews fetched", 200, { page, limit, total, pages: Math.ceil(total / limit) });
     } catch (err) {
       return next(err);
     }

@@ -5,6 +5,7 @@ import { couponSchema, validate } from "../validators/index.js";
 import { successResponse } from "../utils/apiResponse.js";
 import auditLogger from "../utils/auditLogger.js";
 import { assertAuthed } from "../types/http.js";
+import { buildPagination } from "../utils/pagination.js";
 
 const isDuplicateKey = (err: unknown) => (err as { code?: number }).code === 11000;
 
@@ -17,8 +18,11 @@ class CouponController {
 
   async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const coupons = await Coupon.find({ tenant: req.tenant, deletedAt: null }).sort("-createdAt");
-      return successResponse(res, coupons, "Coupons fetched");
+      // Paginated (default 50, max 100): this list was unbounded.
+      const { page, limit, skip } = buildPagination(req.query, { limit: 50 });
+      const filter = { tenant: req.tenant, deletedAt: null };
+      const [coupons, total] = await Promise.all([Coupon.find(filter).sort("-createdAt").skip(skip).limit(limit), Coupon.countDocuments(filter)]);
+      return successResponse(res, coupons, "Coupons fetched", 200, { page, limit, total, pages: Math.ceil(total / limit) });
     } catch (err) {
       return next(err);
     }
