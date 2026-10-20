@@ -79,13 +79,18 @@ export const releaseExpiredReservations = async (now = new Date(), batchSize = 1
     if (cancelledOrder) {
       cancelled += 1;
       released += await releaseOrderReservations(cancelledOrder._id, null, "expired");
-      await publishEvent({
-        type: "order.cancelled",
-        aggregateType: "order",
-        aggregateId: cancelledOrder._id,
-        tenant: cancelledOrder.tenant,
-        payload: { reason: EXPIRED_ORDER_REASON },
-      });
+      // The cancellation is already durable; a failed notification must not abort the rest of the batch.
+      try {
+        await publishEvent({
+          type: "order.cancelled",
+          aggregateType: "order",
+          aggregateId: cancelledOrder._id,
+          tenant: cancelledOrder.tenant,
+          payload: { reason: EXPIRED_ORDER_REASON },
+        });
+      } catch (err) {
+        logEvent("error", "inventory.expiry_event_failed", null, { order: cancelledOrder._id, error: (err as Error).message });
+      }
       continue;
     }
 

@@ -32,6 +32,14 @@ const domainEventSchema = new Schema<DomainEventRecord>(
   { timestamps: true }
 );
 
-domainEventSchema.index({ type: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+// Only keyed events are deduplicated. The previous `sparse` index still indexed every un-keyed
+// event as (type, null), because a compound sparse index skips a document only when all of its
+// fields are missing, so a second event of any type failed with E11000 (SEC-12). Existing
+// databases need `yarn migrate:domain-event-index` to drop the old index.
+export const DOMAIN_EVENT_KEY_INDEX = "type_1_idempotencyKey_1_keyed";
+domainEventSchema.index(
+  { type: 1, idempotencyKey: 1 },
+  { name: DOMAIN_EVENT_KEY_INDEX, unique: true, partialFilterExpression: { idempotencyKey: { $type: "string" } } }
+);
 
 export default mongoose.model<DomainEventRecord>("DomainEvent", domainEventSchema, "domainEvents");

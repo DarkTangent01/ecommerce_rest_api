@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { Coupon, InventoryReservation, Order, Product } from "../../src/models/index.js";
+import { Coupon, DomainEvent, InventoryReservation, Order, Product } from "../../src/models/index.js";
 import OrderService from "../../src/services/OrderService.js";
 import { EXPIRED_ORDER_REASON, releaseExpiredReservations } from "../../src/services/inventoryService.js";
 import { clearDb, startDb, stopDb } from "../helpers/db.js";
@@ -119,5 +119,54 @@ describe("expired reservations (audit C2)", () => {
     await releaseExpiredReservations(new Date(Date.now() + 60 * 60 * 1000));
     expect((await Product.findById(product._id))!.stock).toBe(0);
     expect(await InventoryReservation.findOne({ order: orderId })).toMatchObject({ status: "committed" });
+  });
+
+  it("expires every overdue order in one sweep (SEC-12: only one order.cancelled event could ever be stored)", async () => {
+    const product = await createProduct({ stock: 3 });
+    for (let i = 0; i < 3; i++) {
+      const { auth } = await createUser();
+      await addToCart(auth, product._id);
+      expect((await checkout(auth)).status).toBe(201);
+    }
+
+    expect(await releaseExpiredReservations(new Date(Date.now() + 60 * 60 * 1000))).toEqual({ released: 3, cancelled: 3 });
+    expect((await Product.findById(product._id))!.stock).toBe(3);
+    expect(await DomainEvent.countDocuments({ type: "order.cancelled" })).toBe(3);
+  });
+
+  it("keeps sweeping when publishing an event fails (SEC-12)", async () => {
+    const product = await createProduct({ stock: 2 });
+    for (let i = 0; i < 2; i++) {
+      const { auth } = await createUser();
+      await addToCart(auth, product._id);
+      await checkout(auth);
+    }
+    vi.spyOn(DomainEvent, "create").mockRejectedValue(new Error("event store down"));
+
+    expect(await releaseExpiredReservations(new Date(Date.now() + 60 * 60 * 1000))).toEqual({ released: 2, cancelled: 2 });
+    expect((await Product.findById(product._id))!.stock).toBe(2);
+  });
+});
+
+describe("domain events (SEC-12)", () => {
+  it("lets any number of un-keyed events of one type coexist, but keeps keyed ones unique", async () => {
+    const base = { type: "order.cancelled", aggregateType: "order" };
+    await DomainEvent.create(base);
+    await DomainEvent.create(base);
+    expect(await DomainEvent.countDocuments(base)).toBe(2);
+
+    await DomainEvent.create({ ...base, idempotencyKey: "k-1" });
+    await expect(DomainEvent.create({ ...base, idempotencyKey: "k-1" })).rejects.toMatchObject({ code: 11000 });
+  });
+
+  it("returns 200 for every user's cancellation, not 409 after the first one", async () => {
+    const product = await createProduct({ stock: 2 });
+    for (let i = 0; i < 2; i++) {
+      const { auth } = await createUser();
+      await addToCart(auth, product._id);
+      const orderId = (await checkout(auth)).body.data._id as string;
+      const res = await api().post(`/api/orders/${orderId}/cancel`).set(auth).send({ reason: "changed my mind" });
+      expect(res.status).toBe(200);
+    }
   });
 });
