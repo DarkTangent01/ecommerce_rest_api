@@ -129,7 +129,7 @@ The previous untracked Angular 21 project was committed first as a baseline. I t
 8. No user management. `GET /products` can't list inactive products or filter by seller, so deactivated products don't appear in admin lists.
 9. Single image per product, and variant selection isn't supported at checkout.
 10. `X-Device-Id` isn't in the backend's CORS allowed headers (irrelevant when same-origin).
-11. **Rate limiting trusts `X-Forwarded-For` (`trust proxy 1`).** Behind exactly one proxy that's correct. Exposed directly, any client can pick its own rate-limit bucket. The E2E suite relies on this to give each test its own budget.
+11. **`X-Forwarded-For` is only trusted when the backend sets `TRUST_PROXY`** (off by default since SEC-01). The E2E harness sets `TRUST_PROXY=loopback`, because the specs use `X-Forwarded-For` to give each test its own rate-limit budget. In production, set it to your reverse proxy.
 12. Unpaid orders are auto-cancelled after the reservation window, with no "pay now" flow the frontend could offer.
 
 ## Remaining TODOs

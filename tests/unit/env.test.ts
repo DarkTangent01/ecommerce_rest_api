@@ -74,4 +74,29 @@ describe("parseEnv", () => {
   it("treats empty values as unset", () => {
     expect(parseEnv({ APP_PORT: "", REDIS_URL: "" }, silent)).toMatchObject({ APP_PORT: 5000, REDIS_URL: "" });
   });
+
+  describe("TRUST_PROXY (SEC-01)", () => {
+    it("is off by default, so X-Forwarded-For is ignored", () => {
+      expect(parseEnv({}, silent).TRUST_PROXY).toBe(false);
+      expect(parseEnv({ TRUST_PROXY: "false" }, silent).TRUST_PROXY).toBe(false);
+    });
+
+    it("accepts a hop count or proxy addresses, subnets and presets", () => {
+      expect(parseEnv({ TRUST_PROXY: "1" }, silent).TRUST_PROXY).toBe(1);
+      expect(parseEnv({ TRUST_PROXY: "loopback, 10.0.0.0/8, fd00::/8, 192.0.2.1" }, silent).TRUST_PROXY).toEqual([
+        "loopback",
+        "10.0.0.0/8",
+        "fd00::/8",
+        "192.0.2.1",
+      ]);
+    });
+
+    it("refuses 'true', oversized hop counts and malformed entries", () => {
+      expect(problemsFor({ TRUST_PROXY: "true" })[0]).toMatch(/^TRUST_PROXY: must not be true/);
+      expect(problemsFor({ TRUST_PROXY: "50" })[0]).toMatch(/^TRUST_PROXY: hop count/);
+      expect(problemsFor({ TRUST_PROXY: "loopback,10.0.0.0/33,proxy.internal" })[0]).toBe(
+        "TRUST_PROXY: invalid entries: 10.0.0.0/33, proxy.internal (use loopback, linklocal, uniquelocal, IPs or CIDRs)"
+      );
+    });
+  });
 });

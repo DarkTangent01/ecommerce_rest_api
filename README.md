@@ -281,6 +281,8 @@ Key variables:
 NODE_ENV=development
 APP_PORT=5000
 APP_IP_ADDRESS=127.0.0.1
+# false by default; set to the reverse proxy (hop count or addresses) only when one fronts the app
+TRUST_PROXY=false
 APP_URL=http://localhost:5000
 DB_URL=mongodb://127.0.0.1:27017/ecommerce_rest_api
 

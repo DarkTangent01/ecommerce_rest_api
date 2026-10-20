@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import type { Server } from "http";
-import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT, RESERVATION_SWEEP_SECONDS } from "./config/index.js";
+import { APP_IP_ADDRESS, APP_PORT, CORS_ORIGIN, NODE_ENV, REQUEST_BODY_LIMIT, RESERVATION_SWEEP_SECONDS, TRUST_PROXY } from "./config/index.js";
 import { startReservationSweeper } from "./services/inventoryService.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import helmet from "helmet";
@@ -71,7 +71,8 @@ const startServer = async (): Promise<Server> => {
   await connectWithRetry();
   const stopSweeper = startReservationSweeper(RESERVATION_SWEEP_SECONDS);
 
-  const httpServer = app.listen(APP_PORT, () => console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`));
+  // Bind to the configured address (it used to be ignored, so the API listened on every interface).
+  const httpServer = app.listen(APP_PORT, APP_IP_ADDRESS, () => console.log(`[+] Listening on http://${APP_IP_ADDRESS}:${APP_PORT}/`));
   installProcessHandlers(httpServer, stopSweeper);
   return httpServer;
 };
@@ -88,7 +89,9 @@ if (!fs.existsSync(logsDirectory)) {
 
 // Middleware setup
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
+// Off unless TRUST_PROXY names the proxy in front of the app. A hard-coded hop count let any
+// client pick req.ip via X-Forwarded-For when the app was reached directly (SEC-01).
+app.set("trust proxy", TRUST_PROXY);
 app.use(requestContext);
 app.use(tenantContext);
 app.use(metricsMiddleware);

@@ -1,10 +1,46 @@
 import crypto from "crypto";
+import net from "net";
 import { z } from "zod";
 
 const SECRET_KEYS = ["JWT_SECRET", "REFRESH_SECRET", "WEBHOOK_SECRET", "SERVICE_JWT_SECRET", "SIGNED_URL_SECRET"] as const;
 type SecretKey = (typeof SECRET_KEYS)[number];
 
 const MIN_SECRET_LENGTH = 32;
+
+/** Express `trust proxy` value: false, a hop count, or a list of proxy addresses/subnets. */
+export type TrustProxy = false | number | string[];
+
+const TRUST_PROXY_PRESETS = new Set(["loopback", "linklocal", "uniquelocal"]);
+
+const isAddressOrSubnet = (value: string) => {
+  const [address = "", bits, ...extra] = value.split("/");
+  const version = net.isIP(address);
+  if (!version || extra.length) return false;
+  if (bits === undefined) return true;
+  return /^\d+$/.test(bits) && Number(bits) <= (version === 4 ? 32 : 128);
+};
+
+/**
+ * Parses TRUST_PROXY. Off by default: when the app is reachable without a proxy, trusting
+ * X-Forwarded-For lets every client choose its own IP for rate limits and the admin allowlist
+ * (SEC-01). "true" (trust every hop) is refused for the same reason.
+ */
+export const parseTrustProxy = (raw: string): TrustProxy | { error: string } => {
+  const value = raw.trim().toLowerCase();
+  if (value === "" || value === "false" || value === "0") return false;
+  if (value === "true") return { error: "must not be true (that trusts any client); use a hop count or proxy addresses" };
+  if (/^\d+$/.test(value)) {
+    const hops = Number(value);
+    return hops <= 10 ? hops : { error: "hop count must be 10 or less" };
+  }
+  const entries = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const invalid = entries.filter((entry) => !TRUST_PROXY_PRESETS.has(entry) && !isAddressOrSubnet(entry));
+  if (invalid.length) return { error: `invalid entries: ${invalid.join(", ")} (use loopback, linklocal, uniquelocal, IPs or CIDRs)` };
+  return entries;
+};
 
 // Values that have shipped in this repo's code or .env.example. Anyone can read them, so they are never accepted.
 const KNOWN_PLACEHOLDERS = new Set([
@@ -56,6 +92,7 @@ const baseSchema = z.object({
   CACHE_MAX_ENTRIES: int(1000, { min: 1 }),
   REDIS_URL: z.string().trim().default(""),
   QUEUE_BACKEND: z.enum(["memory", "bullmq"]).default("memory"),
+  TRUST_PROXY: z.string().default("false"),
   ADMIN_IP_ALLOWLIST: z.string().default(""),
   ADMIN_IP_DENYLIST: z.string().default(""),
   SIGNED_URL_TTL_SECONDS: int(300, { min: 1 }),
@@ -65,7 +102,8 @@ const baseSchema = z.object({
   ENABLE_QUERY_PROFILING: bool(false),
 });
 
-export type Env = Omit<z.infer<typeof baseSchema>, SecretKey | "DB_URL" | "APP_URL"> & Record<SecretKey | "DB_URL" | "APP_URL", string>;
+export type Env = Omit<z.infer<typeof baseSchema>, SecretKey | "DB_URL" | "APP_URL" | "TRUST_PROXY"> &
+  Record<SecretKey | "DB_URL" | "APP_URL", string> & { TRUST_PROXY: TrustProxy };
 
 export class EnvValidationError extends Error {
   constructor(readonly problems: string[]) {
@@ -121,10 +159,13 @@ export const parseEnv = (source: NodeJS.ProcessEnv, { onWarning = console.warn }
 
   if (!env.DB_URL && isProduction) problems.push("DB_URL: is required in production");
 
+  const TRUST_PROXY = parseTrustProxy(env.TRUST_PROXY);
+  if (typeof TRUST_PROXY === "object" && !Array.isArray(TRUST_PROXY)) problems.push(`TRUST_PROXY: ${TRUST_PROXY.error}`);
+
   if (problems.length) throw new EnvValidationError(problems);
 
   const DB_URL = env.DB_URL ?? "mongodb://127.0.0.1:27017/ecommerce_rest_api";
   const APP_URL = (env.APP_URL || `http://${env.APP_IP_ADDRESS}:${env.APP_PORT}`).replace(/\/$/, "");
 
-  return { ...env, ...secrets, DB_URL, APP_URL };
+  return { ...env, ...secrets, DB_URL, APP_URL, TRUST_PROXY: TRUST_PROXY as TrustProxy };
 };

@@ -21,6 +21,9 @@ RUN yarn install --frozen-lockfile --production && yarn cache clean
 COPY --from=build /app/dist ./dist
 
 ENV NODE_ENV=production
+# Listen on all container interfaces (the app now honours APP_IP_ADDRESS). Behind a reverse proxy,
+# also set TRUST_PROXY to its address or hop count; it defaults to off.
+ENV APP_IP_ADDRESS=0.0.0.0
 EXPOSE 5000
 
 RUN mkdir -p uploads logs && addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app

@@ -125,6 +125,9 @@ const server = spawn(process.execPath, [path.join(backendRoot, 'node_modules/tsx
     NODE_ENV: 'development',
     APP_PORT: String(PORT),
     APP_IP_ADDRESS: '127.0.0.1',
+    // The ng dev proxy and serve-dist.mjs are the one local hop; the specs set X-Forwarded-For
+    // to give each test its own rate-limit budget (e2e/support/fixtures.ts).
+    TRUST_PROXY: 'loopback',
     APP_URL: `http://127.0.0.1:${PORT}`,
     DB_URL: dbUrl,
     DEBUG_MODE: 'false',

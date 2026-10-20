@@ -11,8 +11,8 @@ export interface Seed {
 }
 
 /**
- * The backend rate-limits auth to 10 attempts per 15 minutes per client IP and trusts one proxy
- * hop (`trust proxy 1`), so through the dev proxy the X-Forwarded-For value is the client IP.
+ * The backend rate-limits auth to 10 attempts per 15 minutes per client IP. backend.mjs starts it with
+ * TRUST_PROXY=loopback, so through the local dev proxy the X-Forwarded-For value is the client IP.
  * Giving every test its own address keeps the suite from exhausting one shared budget.
  */
 export const test = base.extend({
