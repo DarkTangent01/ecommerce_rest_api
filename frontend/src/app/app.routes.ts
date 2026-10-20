@@ -83,9 +83,19 @@ export const routes: Routes = [
       },
       {
         path: 'seller',
-        title: 'Seller dashboard',
         canActivate: [authGuard, sellerGuard],
-        loadComponent: () => import('./features/seller/seller-dashboard.component').then((m) => m.SellerDashboardComponent),
+        children: [
+          {
+            path: '',
+            title: 'Seller dashboard',
+            loadComponent: () => import('./features/seller/seller-dashboard.component').then((m) => m.SellerDashboardComponent),
+          },
+          {
+            path: 'products',
+            title: 'My products',
+            loadComponent: () => import('./features/admin/admin-products.component').then((m) => m.AdminProductsComponent),
+          },
+        ],
       },
       {
         path: 'admin',
@@ -97,9 +107,24 @@ export const routes: Routes = [
             loadComponent: () => import('./features/admin/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
           },
           {
+            path: 'products',
+            title: 'Manage products',
+            loadComponent: () => import('./features/admin/admin-products.component').then((m) => m.AdminProductsComponent),
+          },
+          {
+            path: 'orders',
+            title: 'Manage orders',
+            loadComponent: () => import('./features/admin/admin-orders.component').then((m) => m.AdminOrdersComponent),
+          },
+          {
             path: 'coupons',
             title: 'Coupons',
             loadComponent: () => import('./features/admin/coupon-admin.component').then((m) => m.CouponAdminComponent),
+          },
+          {
+            path: 'settings',
+            title: 'Store settings',
+            loadComponent: () => import('./features/admin/tenant-settings.component').then((m) => m.TenantSettingsComponent),
           },
         ],
       },

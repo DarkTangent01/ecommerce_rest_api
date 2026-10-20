@@ -1,65 +1,37 @@
-import { CurrencyPipe, JsonPipe } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
-import { AdminApiService } from '../../core/api/domain-api.services';
-import { AdminAnalytics } from '../../shared/models/api.models';
+import { AdminApi } from '../../core/api/admin.api';
+import { AsyncStateComponent } from '../../shared/components/async-state.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { errorMessageOf, viewStateOf } from '../../shared/resource-state';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [CurrencyPipe, JsonPipe, RouterLink],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="page-header">
-      <p class="eyebrow">Admin</p>
-      <h1>Business overview</h1>
-      <a class="button ghost" routerLink="/admin/coupons">Manage coupons</a>
-    </section>
-    @if (analytics(); as data) {
-      <section class="dashboard-grid">
-        <article class="stat-card">
-          <span>Users</span><strong>{{ data.users }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Products</span><strong>{{ data.products }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Orders</span><strong>{{ data.orders }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Revenue</span><strong>{{ data.revenue | currency: 'USD' }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Reviews</span><strong>{{ data.reviews }}</strong>
-        </article>
-      </section>
-    }
-    <section class="section split">
-      <article class="panel">
-        <h2>Recent domain events</h2>
-        <pre class="json-panel">{{ events() | json }}</pre>
-      </article>
-      <article class="panel">
-        <h2>Security signals</h2>
-        <pre class="json-panel">{{ signals() | json }}</pre>
-      </article>
-    </section>
-  `,
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, AsyncStateComponent, EmptyStateComponent, MoneyPipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './admin-dashboard.component.html',
+  styleUrl: './admin.scss',
 })
 export class AdminDashboardComponent {
-  private readonly api = inject(AdminApiService);
-  readonly analytics = signal<AdminAnalytics | null>(null);
-  readonly events = signal<unknown[]>([]);
-  readonly signals = signal<unknown[]>([]);
-  constructor() {
-    this.api.analytics().subscribe((data) => this.analytics.set(data));
-    this.api
-      .platformEvents()
-      .subscribe({ next: (events) => this.events.set(events), error: () => this.events.set([]) });
-    this.api
-      .securitySignals()
-      .subscribe({
-        next: (signals) => this.signals.set(signals),
-        error: () => this.signals.set([]),
-      });
-  }
+  private readonly api = inject(AdminApi);
+
+  readonly analytics = rxResource({ stream: () => this.api.analytics() });
+  readonly analyticsState = computed(() => viewStateOf(this.analytics));
+  readonly analyticsError = computed(() => errorMessageOf(this.analytics));
+
+  readonly signals = rxResource({ stream: () => this.api.securitySignals() });
+  readonly signalsState = computed(() => viewStateOf(this.signals));
+  readonly recentSignals = computed(() => (this.signals.value() ?? []).slice(0, 8));
+
+  readonly sections = [
+    { link: '/admin/products', icon: 'inventory_2', title: 'Products', text: 'Create, edit and retire products.' },
+    { link: '/admin/orders', icon: 'local_shipping', title: 'Orders', text: 'Track payments, ship, cancel or request refunds.' },
+    { link: '/admin/coupons', icon: 'sell', title: 'Coupons', text: 'Discount codes and their limits.' },
+    { link: '/admin/settings', icon: 'tune', title: 'Store settings', text: 'Store name, currency and status.' },
+  ];
 }

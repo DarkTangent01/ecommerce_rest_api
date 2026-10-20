@@ -1,0 +1,58 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Store overview</h1>
+      <p>Figures cover your store (tenant) only.</p>
+    </div>
+  </header>
+
+  <app-async-state [state]="analyticsState()" [errorMessage]="analyticsError()" (retry)="analytics.reload()">
+    @if (analytics.value(); as stats) {
+      <ul class="stats" aria-label="Key figures">
+        <li class="surface"><span>Revenue (paid)</span><strong>{{ stats.revenue | money }}</strong></li>
+        <li class="surface"><span>Orders</span><strong>{{ stats.orders }}</strong></li>
+        <li class="surface"><span>Products</span><strong>{{ stats.products }}</strong></li>
+        <li class="surface"><span>Customers</span><strong>{{ stats.users }}</strong></li>
+        <li class="surface"><span>Reviews</span><strong>{{ stats.reviews }}</strong></li>
+      </ul>
+    }
+  </app-async-state>
+
+  <nav class="sections" aria-label="Admin sections">
+    @for (section of sections; track section.link) {
+      <a class="section surface" [routerLink]="section.link">
+        <mat-icon aria-hidden="true">{{ section.icon }}</mat-icon>
+        <div>
+          <strong>{{ section.title }}</strong>
+          <p class="muted">{{ section.text }}</p>
+        </div>
+      </a>
+    }
+  </nav>
+
+  <section class="surface" aria-labelledby="signals-title">
+    <h2 id="signals-title">Recent security signals</h2>
+    <app-async-state [state]="signalsState()" (retry)="signals.reload()">
+      @if (recentSignals().length) {
+        <table class="table">
+          <thead>
+            <tr><th scope="col">When</th><th scope="col">Type</th><th scope="col">Severity</th><th scope="col">IP</th></tr>
+          </thead>
+          <tbody>
+            @for (signal of recentSignals(); track signal._id) {
+              <tr>
+                <td>{{ signal.createdAt | date: 'short' }}</td>
+                <td>{{ signal.type }}</td>
+                <td><span class="severity" [attr.data-severity]="signal.severity">{{ signal.severity }}</span></td>
+                <td>{{ signal.ip ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <app-empty-state icon="verified_user" title="No security signals" />
+      }
+    </app-async-state>
+  </section>
+</div>

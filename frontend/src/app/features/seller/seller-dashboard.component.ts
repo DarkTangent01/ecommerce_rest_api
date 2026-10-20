@@ -1,92 +1,49 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { SellerApiService } from '../../core/api/domain-api.services';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
+import { filter } from 'rxjs';
+import { SellerApi } from '../../core/api/admin.api';
+import type { Order, Shipment } from '../../core/models';
+import { AsyncStateComponent } from '../../shared/components/async-state.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { StatusChipComponent } from '../../shared/components/status-chip.component';
 import { ToastService } from '../../shared/components/toast.service';
-import { SellerDashboard } from '../../shared/models/api.models';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { errorMessageOf, viewStateOf } from '../../shared/resource-state';
+import { ShipmentDialogComponent, type ShipmentDialogData } from '../admin/shipment-dialog.component';
 
 @Component({
   selector: 'app-seller-dashboard',
-  imports: [CurrencyPipe, DatePipe, ReactiveFormsModule, EmptyStateComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="page-header">
-      <p class="eyebrow">Seller</p>
-      <h1>Seller dashboard</h1>
-    </section>
-    @if (dashboard(); as data) {
-      <section class="dashboard-grid">
-        <article class="stat-card">
-          <span>Products</span><strong>{{ data.productCount }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Revenue</span><strong>{{ data.revenue | currency: 'USD' }}</strong>
-        </article>
-        <article class="stat-card">
-          <span>Low stock</span><strong>{{ data.lowStock.length }}</strong>
-        </article>
-      </section>
-      <section class="section split">
-        <article class="panel">
-          <h2>Recent orders</h2>
-          @for (order of data.recentOrders; track order._id) {
-            <div class="order-row">
-              <span>#{{ order._id.slice(-8) }}</span>
-              <span>{{ order.createdAt | date: 'short' }}</span>
-              <strong>{{ order.total | currency: 'USD' }}</strong>
-            </div>
-          } @empty {
-            <app-empty-state
-              title="No seller orders"
-              description="Orders containing your products will appear here."
-              icon="0"
-            />
-          }
-        </article>
-        <form class="form-card" [formGroup]="shipmentForm" (ngSubmit)="updateShipment()">
-          <h2>Update shipment</h2>
-          <label>Order ID <input formControlName="orderId" /></label>
-          <label>Carrier <input formControlName="carrier" /></label>
-          <label>Tracking number <input formControlName="trackingNumber" /></label>
-          <label>Tracking URL <input formControlName="trackingUrl" /></label>
-          <label
-            >Status
-            <select formControlName="status">
-              <option value="label_created">Label created</option>
-              <option value="in_transit">In transit</option>
-              <option value="delivered">Delivered</option>
-              <option value="failed">Failed</option>
-            </select>
-          </label>
-          <button class="button primary wide" type="submit" [disabled]="shipmentForm.invalid">
-            Save shipment
-          </button>
-        </form>
-      </section>
-    }
-  `,
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, AsyncStateComponent, EmptyStateComponent, StatusChipComponent, MoneyPipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './seller-dashboard.component.html',
+  styleUrl: '../admin/admin.scss',
 })
 export class SellerDashboardComponent {
-  private readonly api = inject(SellerApiService);
+  private readonly api = inject(SellerApi);
+  private readonly dialog = inject(MatDialog);
   private readonly toast = inject(ToastService);
-  private readonly fb = inject(FormBuilder);
-  readonly dashboard = signal<SellerDashboard | null>(null);
-  readonly shipmentForm = this.fb.nonNullable.group({
-    orderId: ['', Validators.required],
-    carrier: ['', Validators.required],
-    trackingNumber: ['', Validators.required],
-    trackingUrl: '',
-    status: ['label_created' as const, Validators.required],
-  });
-  constructor() {
-    this.api.dashboard().subscribe((data) => this.dashboard.set(data));
+
+  readonly dashboard = rxResource({ stream: () => this.api.dashboard() });
+  readonly state = computed(() => viewStateOf(this.dashboard));
+  readonly error = computed(() => errorMessageOf(this.dashboard));
+
+  canShip(order: Order): boolean {
+    return order.paymentStatus === 'paid' && ['confirmed', 'processing', 'shipped'].includes(order.status);
   }
-  updateShipment(): void {
-    const { orderId, ...payload } = this.shipmentForm.getRawValue();
-    this.api.updateShipment(orderId, payload).subscribe({
-      next: () => this.toast.show('Shipment updated', 'success'),
-      error: (err) => this.toast.show(err.error?.message ?? 'Shipment update failed', 'error'),
-    });
+
+  ship(order: Order): void {
+    this.dialog
+      .open<ShipmentDialogComponent, ShipmentDialogData, Shipment>(ShipmentDialogComponent, { data: { orderId: order._id } })
+      .afterClosed()
+      .pipe(filter((shipment): shipment is Shipment => Boolean(shipment)))
+      .subscribe(() => {
+        this.toast.show('Shipment updated.', 'success');
+        this.dashboard.reload();
+      });
   }
 }

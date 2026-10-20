@@ -1,0 +1,72 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Seller</p>
+      <h1>Seller dashboard</h1>
+    </div>
+    <a mat-flat-button routerLink="/seller/products"><mat-icon>inventory_2</mat-icon> Manage products</a>
+  </header>
+
+  <app-async-state [state]="state()" [errorMessage]="error()" (retry)="dashboard.reload()">
+    @if (dashboard.value(); as data) {
+      <ul class="stats" aria-label="Key figures">
+        <li class="surface"><span>Revenue (paid)</span><strong>{{ data.revenue | money }}</strong></li>
+        <li class="surface"><span>Products</span><strong>{{ data.productCount }}</strong></li>
+        <li class="surface"><span>Low stock</span><strong>{{ data.lowStock.length }}</strong></li>
+      </ul>
+
+      @if (data.lowStock.length) {
+        <section class="surface editor" aria-labelledby="low-stock">
+          <h2 id="low-stock">Low stock</h2>
+          <table class="table">
+            <thead><tr><th scope="col">Product</th><th scope="col" class="num">Stock</th></tr></thead>
+            <tbody>
+              @for (product of data.lowStock; track product._id) {
+                <tr>
+                  <td><a [routerLink]="['/products', product._id]">{{ product.name }}</a></td>
+                  <td class="num">{{ product.stock }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      <section class="surface" aria-labelledby="recent-orders">
+        <h2 id="recent-orders">Recent orders with your products</h2>
+        @if (data.recentOrders.length) {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Order</th>
+                  <th scope="col">Placed</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Payment</th>
+                  <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of data.recentOrders; track order._id) {
+                  <tr>
+                    <td>…{{ order._id.slice(-8) }}</td>
+                    <td>{{ order.createdAt | date: 'short' }}</td>
+                    <td><app-status-chip [status]="order.status" /></td>
+                    <td><app-status-chip [status]="order.paymentStatus" /></td>
+                    <td class="num">
+                      @if (canShip(order)) {
+                        <button mat-stroked-button type="button" (click)="ship(order)"><mat-icon>local_shipping</mat-icon> Ship</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <app-empty-state icon="receipt_long" title="No orders yet" description="Orders containing your products will appear here." />
+        }
+      </section>
+    }
+  </app-async-state>
+</div>

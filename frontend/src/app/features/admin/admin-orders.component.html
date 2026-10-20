@@ -1,0 +1,55 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Orders</h1>
+      <p>Payments are confirmed automatically by the payment provider.</p>
+    </div>
+  </header>
+
+  <app-async-state [state]="state()" [errorMessage]="error()" (retry)="orders.reload()">
+    @if (orders.value()?.items?.length) {
+      <div class="table-wrap">
+        <table class="table">
+          <caption class="visually-hidden">Orders</caption>
+          <thead>
+            <tr>
+              <th scope="col">Order</th>
+              <th scope="col">Placed</th>
+              <th scope="col">Status</th>
+              <th scope="col">Payment</th>
+              <th scope="col" class="num">Total</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (order of orders.value()!.items; track order._id) {
+              <tr>
+                <td><a [routerLink]="['/account/orders', order._id]">…{{ order._id.slice(-8) }}</a></td>
+                <td>{{ order.createdAt | date: 'short' }}</td>
+                <td><app-status-chip [status]="order.status" /></td>
+                <td><app-status-chip [status]="order.paymentStatus" /></td>
+                <td class="num">{{ order.total | money }}</td>
+                <td class="num">
+                  @if (canShip(order)) {
+                    <button mat-stroked-button type="button" (click)="ship(order)"><mat-icon>local_shipping</mat-icon> Ship</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [length]="orders.value()!.meta.total"
+        [pageIndex]="page() - 1"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        (page)="changePage($event)"
+        aria-label="Choose orders page"
+      />
+    } @else {
+      <app-empty-state icon="receipt_long" title="No orders yet" />
+    }
+  </app-async-state>
+</div>
