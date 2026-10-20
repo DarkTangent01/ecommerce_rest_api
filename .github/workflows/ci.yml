@@ -18,7 +18,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          # The dev toolchain needs a newer Node than the app: vitest 5 requires ^22.12 || >=24 and
+          # eslint 10 ^20.19 || ^22.13 || >=24. 24 is the LTS all local checks run on.
+          node-version: 24
           cache: yarn
       - run: yarn install --frozen-lockfile
       - run: yarn typecheck

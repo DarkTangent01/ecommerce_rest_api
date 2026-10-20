@@ -722,7 +722,7 @@ docker run --env-file .env -p 5000:5000 ecommerce-rest-api
 
 Dockerfile properties:
 
-- Compiles TypeScript in a `node:20-alpine` build stage and runs `dist/` on `node:20-alpine`.
+- Compiles TypeScript in a `node:24-alpine` build stage and runs `dist/` on `node:24-alpine` (Node 24 LTS; the dev toolchain needs Node ^22.13 or >=24, and yarn v1 checks engines even for production installs).
 - Installs production dependencies only in the runtime image.
 - Runs as non-root `appuser`.
 - Includes API healthcheck.

@@ -1,5 +1,6 @@
 # --- build: compile TypeScript ---
-FROM node:20-alpine AS build
+# Needs the dev toolchain, which requires a newer Node than the app (vitest 5, eslint 10).
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -11,7 +12,9 @@ COPY src ./src
 RUN yarn build
 
 # --- runtime: production dependencies + compiled output only ---
-FROM node:20-alpine
+# Same major as the build stage: yarn v1 checks every lockfile package's engines even for a
+# --production install, so a Node 20 runtime is refused because of vitest 5.
+FROM node:24-alpine
 
 WORKDIR /app
 

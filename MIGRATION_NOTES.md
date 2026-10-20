@@ -161,7 +161,7 @@ No routes were added, removed or renamed. Response fields were only **added**. T
 
 **Open items, deliberately not done:**
 
-- The Docker image now builds and runs on `node:20-alpine` (runtime upgraded from the EOL Node 18 with approval). The Docker build itself was **not verified**, because Docker isn't installed on this machine.
+- The Docker image now builds and runs on `node:24-alpine` (runtime upgraded from the EOL Node 18 with approval; first to Node 20, then to 24 because vitest 5 and eslint 10 refuse Node 20 and yarn v1 enforces their engines even in the production install). The Docker build itself was **not verified**, because Docker isn't installed on this machine.
 - **No MFA.** Step-up blocks risky sessions but offers no way to complete a challenge.
 - **No refresh-token reuse detection.** Presenting a revoked token could revoke the whole token family.
 - Login timing: bcrypt only runs when the email exists, which allows user enumeration by timing.
