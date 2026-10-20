@@ -37,11 +37,6 @@ export class ApiClientService {
     );
   }
 
-  /** @deprecated Used by the legacy services in domain-api.services.ts until they are removed. */
-  getEnvelope<T>(path: string, query?: Query): Observable<{ success: boolean; message: string; data: T; meta?: Record<string, unknown> }> {
-    return this.http.get<ApiSuccess<T, Record<string, unknown>>>(this.url(path), { params: this.params(query) });
-  }
-
   post<T>(path: string, body: unknown = {}, options?: RequestOptions): Observable<T> {
     return this.http.post<ApiSuccess<T>>(this.url(path), body, this.httpOptions(options)).pipe(map((res) => res.data));
   }

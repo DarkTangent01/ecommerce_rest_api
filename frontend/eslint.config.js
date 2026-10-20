@@ -15,9 +15,7 @@ module.exports = defineConfig([
     ],
     processor: angular.processInlineTemplates,
     rules: {
-      // TEMPORARY: the v22 migration pinned legacy components to Eager change detection.
-      // They are being rewritten as OnPush; this goes back to 'error' once none remain.
-      '@angular-eslint/prefer-on-push-component-change-detection': 'warn',
+      '@angular-eslint/prefer-on-push-component-change-detection': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@angular-eslint/directive-selector': [
