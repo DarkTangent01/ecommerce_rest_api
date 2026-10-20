@@ -11,13 +11,14 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        title: 'Shop',
+        title: 'Shop electronics, home, kitchen and more',
+        data: { description: 'Shop kitchen, home, apparel, electronics and outdoor gear on AeroScript. Secure checkout and order tracking.' },
         loadComponent: () => import('./features/products/home.component').then((m) => m.HomeComponent),
       },
       {
         path: 'products',
         title: 'Products',
-        data: { description: 'Browse and search the catalogue.' },
+        data: { description: 'Browse, search and filter the AeroScript catalogue by category and price.' },
         loadComponent: () => import('./features/products/product-list.component').then((m) => m.ProductListComponent),
       },
       {
@@ -28,35 +29,41 @@ export const routes: Routes = [
       {
         path: 'login',
         title: 'Sign in',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [guestGuard],
         loadComponent: () => import('./features/auth/login.component').then((m) => m.LoginComponent),
       },
       {
         path: 'register',
         title: 'Create account',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [guestGuard],
         loadComponent: () => import('./features/auth/register.component').then((m) => m.RegisterComponent),
       },
       {
         path: 'cart',
         title: 'Cart',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard],
         loadComponent: () => import('./features/cart/cart.component').then((m) => m.CartComponent),
       },
       {
         path: 'checkout',
         title: 'Checkout',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard],
         loadComponent: () => import('./features/checkout/checkout.component').then((m) => m.CheckoutComponent),
       },
       {
         path: 'checkout/complete/:id',
         title: 'Order placed',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard],
         loadComponent: () => import('./features/checkout/order-confirmation.component').then((m) => m.OrderConfirmationComponent),
       },
       {
         path: 'account',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard],
         children: [
           {
@@ -83,6 +90,7 @@ export const routes: Routes = [
       },
       {
         path: 'seller',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard, sellerGuard],
         children: [
           {
@@ -99,6 +107,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin',
+        data: { robots: 'noindex, nofollow' },
         canActivate: [authGuard, adminGuard],
         children: [
           {
@@ -136,11 +145,13 @@ export const routes: Routes = [
       { path: 'wishlist', redirectTo: 'account/wishlist' },
       {
         path: 'unauthorized',
+        data: { robots: 'noindex, nofollow' },
         title: 'Access denied',
         loadComponent: () => import('./features/errors/error-pages.component').then((m) => m.UnauthorizedComponent),
       },
       {
         path: '**',
+        data: { robots: 'noindex, nofollow' },
         title: 'Page not found',
         loadComponent: () => import('./features/errors/error-pages.component').then((m) => m.NotFoundComponent),
       },

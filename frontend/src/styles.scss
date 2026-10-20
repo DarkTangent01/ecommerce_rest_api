@@ -1,28 +1,77 @@
 @use '@angular/material' as mat;
+@use 'tokens' as t;
 
-// Material 3 theme. Components read the generated --mat-sys-* variables.
+// Material 3, re-skinned with the AeroScript tokens: Material components and our own components
+// read the same palette, so there is one design system rather than two.
 html {
   height: 100%;
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        primary: mat.$blue-palette,
+        tertiary: mat.$orange-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: var(--as-font-sans),
+        brand-family: var(--as-font-display),
+        bold-weight: 600,
+        medium-weight: 500,
+        regular-weight: 400,
+      ),
       density: 0,
+    )
+  );
+  @include mat.theme-overrides(
+    (
+      primary: var(--as-brand-600),
+      on-primary: var(--as-white),
+      primary-container: var(--as-brand-100),
+      on-primary-container: var(--as-brand-700),
+      secondary-container: var(--as-brand-50),
+      on-secondary-container: var(--as-brand-700),
+      tertiary: var(--as-flare-600),
+      error: var(--as-danger-700),
+      surface: var(--as-surface),
+      on-surface: var(--as-text),
+      on-surface-variant: var(--as-text-muted),
+      outline: var(--as-border-strong),
+      outline-variant: var(--as-border),
+      surface-container-lowest: var(--as-surface),
+      surface-container-low: var(--as-gray-50),
+      surface-container: var(--as-gray-100),
+      surface-container-high: var(--as-gray-100),
+      surface-container-highest: var(--as-gray-200),
+      corner-small: var(--as-radius-sm),
+      corner-medium: var(--as-radius-md),
+      corner-large: var(--as-radius-lg),
+      corner-full: var(--as-radius-pill),
+    )
+  );
+
+  // Buttons read slightly squarer than Material's default pill, matching cards and inputs.
+  @include mat.button-overrides(
+    (
+      filled-container-shape: var(--as-radius-md),
+      outlined-container-shape: var(--as-radius-md),
+      text-container-shape: var(--as-radius-md),
+      protected-container-shape: var(--as-radius-md),
+      filled-label-text-weight: 600,
+      outlined-label-text-weight: 600,
     )
   );
 }
 
 body {
   color-scheme: light;
-  background-color: var(--mat-sys-surface-container-lowest);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
+  background-color: var(--as-bg);
+  color: var(--as-text);
+  font-family: var(--as-font-sans);
+  font-size: var(--as-text-md);
+  line-height: var(--as-leading-normal);
   margin: 0;
   min-height: 100%;
   min-width: 320px;
+  -webkit-font-smoothing: antialiased;
 }
 
 *,
@@ -37,74 +86,79 @@ img {
 }
 
 a {
-  color: var(--mat-sys-primary);
+  color: var(--as-link);
+  text-underline-offset: 2px;
 }
 
 h1,
 h2,
 h3 {
   margin: 0;
+  font-family: var(--as-font-display);
+  letter-spacing: -0.01em;
+  line-height: var(--as-leading-tight);
 }
 
 h1 {
-  font: var(--mat-sys-headline-medium);
+  font-size: var(--as-text-2xl);
+  font-weight: var(--as-weight-bold);
 }
 
 h2 {
-  font: var(--mat-sys-title-large);
+  font-size: var(--as-text-xl);
+  font-weight: var(--as-weight-semibold);
 }
 
 h3 {
-  font: var(--mat-sys-title-medium);
+  font-size: var(--as-text-md);
+  font-weight: var(--as-weight-semibold);
 }
 
-// Shared layout primitives used by feature pages.
-.page {
-  width: min(1200px, 100%);
-  margin: 0 auto;
-  padding: 24px 16px 64px;
+// ---- Layout primitives ---------------------------------------------------------------------
 
-  @media (min-width: 768px) {
-    padding: 32px 24px 80px;
-  }
+.page {
+  width: min(var(--as-container), 100%);
+  margin: 0 auto;
+  padding: var(--as-space-6) var(--as-gutter) var(--as-space-16);
 }
 
 .page-header {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: var(--as-space-3) var(--as-space-6);
   align-items: end;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: var(--as-space-6);
 
   p {
-    margin: 4px 0 0;
-    color: var(--mat-sys-on-surface-variant);
+    margin: var(--as-space-1) 0 0;
+    color: var(--as-text-muted);
   }
 }
 
 .eyebrow {
-  font: var(--mat-sys-label-large);
-  color: var(--mat-sys-primary);
+  font-size: var(--as-text-xs);
+  font-weight: var(--as-weight-semibold);
+  color: var(--as-brand-600);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 4px;
+  letter-spacing: 0.08em;
+  margin: 0 0 var(--as-space-1);
 }
 
 .muted {
-  color: var(--mat-sys-on-surface-variant);
+  color: var(--as-text-muted);
 }
 
 .stack {
   display: grid;
-  gap: 16px;
+  gap: var(--as-space-4);
 }
 
 .form-grid {
   display: grid;
-  gap: 4px 16px;
+  gap: var(--as-space-1) var(--as-space-4);
 
-  @media (min-width: 640px) {
+  @include t.up(t.$bp-sm) {
     &.two {
       grid-template-columns: 1fr 1fr;
     }
@@ -116,41 +170,51 @@ h3 {
 }
 
 .surface {
-  background: var(--mat-sys-surface);
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 16px;
-  padding: 20px;
+  background: var(--as-surface);
+  border: var(--as-border-width) solid var(--as-border);
+  border-radius: var(--as-radius-lg);
+  padding: var(--as-space-5);
+  box-shadow: var(--as-shadow-1);
 }
 
 .product-grid {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--as-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  @include t.up(t.$bp-sm) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--as-space-4);
   }
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--as-space-4);
   padding: 6px 0;
 
   &.total {
-    font: var(--mat-sys-title-medium);
-    border-top: 1px solid var(--mat-sys-outline-variant);
-    margin-top: 8px;
-    padding-top: 12px;
+    font-size: var(--as-text-lg);
+    font-weight: var(--as-weight-semibold);
+    border-top: var(--as-border-width) solid var(--as-border);
+    margin-top: var(--as-space-2);
+    padding-top: var(--as-space-3);
   }
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--as-space-2);
   align-items: center;
+}
+
+// The "buy" call to action: AeroScript's warm flare, with dark text for contrast.
+.mat-mdc-unelevated-button.as-buy:not(:disabled) {
+  --mat-button-filled-container-color: var(--as-flare-500);
+  --mat-button-filled-label-text-color: var(--as-on-flare);
+  --mat-button-filled-state-layer-color: var(--as-on-flare);
 }
 
 .visually-hidden {
@@ -162,21 +226,43 @@ h3 {
   white-space: nowrap;
 }
 
-// Snack bar tones set by ToastService.
+// ---- Loading skeletons --------------------------------------------------------------------
+
+.as-skeleton {
+  display: block;
+  border-radius: var(--as-radius-sm);
+  background: linear-gradient(90deg, var(--as-gray-100) 25%, var(--as-gray-200) 37%, var(--as-gray-100) 63%);
+  background-size: 400% 100%;
+  animation: as-shimmer 1.4s ease infinite;
+}
+
+@keyframes as-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+// ---- Toasts (ToastService) -----------------------------------------------------------------
+
 .toast-error {
-  --mat-snack-bar-container-color: var(--mat-sys-error-container);
-  --mat-snack-bar-supporting-text-color: var(--mat-sys-on-error-container);
-  --mat-snack-bar-button-color: var(--mat-sys-on-error-container);
+  --mat-snack-bar-container-color: var(--as-danger-700);
+  --mat-snack-bar-supporting-text-color: var(--as-white);
+  --mat-snack-bar-button-color: var(--as-white);
 }
 
 .toast-success {
-  --mat-snack-bar-container-color: var(--mat-sys-primary-container);
-  --mat-snack-bar-supporting-text-color: var(--mat-sys-on-primary-container);
-  --mat-snack-bar-button-color: var(--mat-sys-on-primary-container);
+  --mat-snack-bar-container-color: var(--as-ink-900);
+  --mat-snack-bar-supporting-text-color: var(--as-text-inverse);
+  --mat-snack-bar-button-color: var(--as-flare-500);
 }
 
+// ---- Accessibility -----------------------------------------------------------------------
+
 :focus-visible {
-  outline: 2px solid var(--mat-sys-primary);
+  outline: 2px solid var(--as-focus);
   outline-offset: 2px;
 }
 
@@ -185,6 +271,8 @@ h3 {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

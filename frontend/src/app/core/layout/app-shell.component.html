@@ -1,24 +1,33 @@
 <a class="skip-link" href="#main" (click)="skipToContent($event)">Skip to main content</a>
 
 <mat-sidenav-container class="shell">
-  <mat-sidenav
-    class="drawer"
-    [mode]="'over'"
-    [opened]="drawerOpen()"
-    (closedStart)="drawerOpen.set(false)"
-    aria-label="Site navigation"
-  >
+  <mat-sidenav class="drawer" mode="over" [opened]="drawerOpen()" (closedStart)="drawerOpen.set(false)" aria-label="Site navigation">
+    <div class="drawer-head">
+      <app-logo />
+      <p class="drawer-greeting">
+        @if (auth.user(); as user) {
+          Hello, {{ firstName() }}
+        } @else {
+          Hello, welcome
+        }
+      </p>
+    </div>
     <mat-nav-list>
       <a mat-list-item routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
         <mat-icon matListItemIcon>home</mat-icon><span matListItemTitle>Home</span>
       </a>
-      <a mat-list-item routerLink="/products" routerLinkActive="active">
-        <mat-icon matListItemIcon>storefront</mat-icon><span matListItemTitle>Shop</span>
+      <a mat-list-item routerLink="/products" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon matListItemIcon>storefront</mat-icon><span matListItemTitle>All products</span>
       </a>
-      @if (auth.isAuthenticated()) {
-        <a mat-list-item routerLink="/cart" routerLinkActive="active">
-          <mat-icon matListItemIcon>shopping_cart</mat-icon><span matListItemTitle>Cart ({{ cart.count() }})</span>
+      <h2 class="drawer-section">Shop by category</h2>
+      @for (category of categories; track category.value) {
+        <a mat-list-item routerLink="/products" [queryParams]="{ category: category.value }">
+          <mat-icon matListItemIcon>{{ category.icon }}</mat-icon><span matListItemTitle>{{ category.label }}</span>
         </a>
+      }
+      <mat-divider />
+      @if (auth.isAuthenticated()) {
+        <h2 class="drawer-section">Your account</h2>
         <a mat-list-item routerLink="/account/orders" routerLinkActive="active">
           <mat-icon matListItemIcon>receipt_long</mat-icon><span matListItemTitle>Orders</span>
         </a>
@@ -29,9 +38,8 @@
           <mat-icon matListItemIcon>person</mat-icon><span matListItemTitle>Account</span>
         </a>
         @if (isSeller()) {
-          <mat-divider />
           <a mat-list-item routerLink="/seller" routerLinkActive="active">
-            <mat-icon matListItemIcon>inventory_2</mat-icon><span matListItemTitle>Seller</span>
+            <mat-icon matListItemIcon>inventory_2</mat-icon><span matListItemTitle>Seller hub</span>
           </a>
         }
         @if (isAdmin()) {
@@ -51,54 +59,70 @@
   </mat-sidenav>
 
   <mat-sidenav-content class="content">
-    <header>
-      <mat-toolbar class="toolbar">
-        @if (isHandset()) {
-          <button mat-icon-button type="button" aria-label="Open navigation" (click)="drawerOpen.set(true)">
-            <mat-icon>menu</mat-icon>
-          </button>
-        }
-        <a class="brand" routerLink="/" [attr.aria-label]="appName + ' home'">
-          <mat-icon aria-hidden="true">shopping_bag</mat-icon>
-          <span>{{ appName }}</span>
+    <header class="masthead">
+      <div class="bar">
+        <button class="menu" mat-icon-button type="button" aria-label="Open navigation" (click)="drawerOpen.set(true)">
+          <mat-icon>menu</mat-icon>
+        </button>
+
+        <a class="brand" routerLink="/" aria-label="AeroScript home">
+          <app-logo tone="inverse" />
         </a>
 
-        <form class="search" role="search" (ngSubmit)="submitSearch()">
-          <label for="site-search" class="visually-hidden">Search products</label>
-          <mat-icon aria-hidden="true">search</mat-icon>
-          <input id="site-search" type="search" [formControl]="search" placeholder="Search products" maxlength="100" />
-        </form>
+        <div class="search-slot">
+          <app-search-box />
+        </div>
 
-        @if (!isHandset()) {
-          <nav class="nav" aria-label="Main">
-            <a mat-button routerLink="/products" routerLinkActive="active">Shop</a>
-            @if (isSeller()) {
-              <a mat-button routerLink="/seller" routerLinkActive="active">Seller</a>
-            }
-            @if (isAdmin()) {
-              <a mat-button routerLink="/admin" routerLinkActive="active">Admin</a>
-            }
-          </nav>
-        }
-
-        @if (auth.isAuthenticated()) {
-          <a
-            mat-icon-button
-            routerLink="/cart"
-            [attr.aria-label]="'Cart, ' + cart.count() + (cart.count() === 1 ? ' item' : ' items')"
-          >
-            <mat-icon [matBadge]="cart.count() || null" matBadgeSize="small" aria-hidden="true">shopping_cart</mat-icon>
-          </a>
-          @if (!isHandset()) {
-            <button mat-icon-button type="button" [matMenuTriggerFor]="accountMenu" aria-label="Account menu">
-              <mat-icon>account_circle</mat-icon>
+        <div class="tools">
+          @if (auth.isAuthenticated()) {
+            <button class="tool account" type="button" [matMenuTriggerFor]="accountMenu" aria-label="Account menu">
+              <span class="tool-small">Hello, {{ firstName() }}</span>
+              <span class="tool-main">Account <mat-icon aria-hidden="true">expand_more</mat-icon></span>
             </button>
+            <a class="tool orders" routerLink="/account/orders">
+              <span class="tool-small">Returns</span>
+              <span class="tool-main">&amp; Orders</span>
+            </a>
+          } @else {
+            <a class="tool account" routerLink="/login">
+              <span class="tool-small">Hello, sign in</span>
+              <span class="tool-main">Sign in</span>
+            </a>
           }
-        } @else if (!isHandset()) {
-          <a mat-button routerLink="/login">Sign in</a>
-          <a mat-flat-button routerLink="/register">Create account</a>
-        }
-      </mat-toolbar>
+          <a class="tool icon-tool wishlist" routerLink="/account/wishlist" aria-label="Wishlist">
+            <mat-icon aria-hidden="true">favorite_border</mat-icon>
+          </a>
+          <a class="tool icon-tool cart" routerLink="/cart" [attr.aria-label]="cartLabel()">
+            <span class="cart-icon">
+              <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+              <span class="cart-count" aria-hidden="true">{{ cart.count() }}</span>
+            </span>
+            <span class="tool-main cart-word" aria-hidden="true">Cart</span>
+          </a>
+        </div>
+      </div>
+
+      <nav class="catbar" aria-label="Shop by category">
+        <ul>
+          <li>
+            <a routerLink="/products" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">All products</a>
+          </li>
+          @for (category of categories; track category.value) {
+            <li>
+              <a routerLink="/products" [queryParams]="{ category: category.value }" [class.active]="activeCategory() === category.value">
+                {{ category.label }}
+              </a>
+            </li>
+          }
+          @if (isSeller()) {
+            <li class="role-link"><a routerLink="/seller" routerLinkActive="active">Seller hub</a></li>
+          }
+          @if (isAdmin()) {
+            <li><a routerLink="/admin" routerLinkActive="active">Admin</a></li>
+          }
+        </ul>
+      </nav>
+
       @if (loading.isLoading()) {
         <mat-progress-bar class="progress" mode="indeterminate" aria-label="Loading" />
       }
@@ -109,8 +133,43 @@
     </main>
 
     <footer class="footer">
-      <span>&copy; {{ appName }}</span>
-      <span class="muted">Prices and totals are always calculated by our servers.</span>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <app-logo tone="inverse" />
+          <p>Discover products, compare prices and check out securely. Totals are always confirmed by our servers.</p>
+        </div>
+        <nav aria-label="Shop">
+          <h2>Shop</h2>
+          <ul>
+            <li><a routerLink="/products">All products</a></li>
+            @for (category of categories; track category.value) {
+              <li><a routerLink="/products" [queryParams]="{ category: category.value }">{{ category.label }}</a></li>
+            }
+          </ul>
+        </nav>
+        <nav aria-label="Your account">
+          <h2>Your account</h2>
+          <ul>
+            @if (auth.isAuthenticated()) {
+              <li><a routerLink="/account">Account</a></li>
+              <li><a routerLink="/account/orders">Orders</a></li>
+              <li><a routerLink="/account/wishlist">Wishlist</a></li>
+              <li><a routerLink="/cart">Cart</a></li>
+            } @else {
+              <li><a routerLink="/login">Sign in</a></li>
+              <li><a routerLink="/register">Create account</a></li>
+            }
+          </ul>
+        </nav>
+        <div class="footer-notes">
+          <h2>Shopping with AeroScript</h2>
+          <ul>
+            <li>Payments are confirmed by our payment provider before an order is marked paid.</li>
+            <li>Track every order and request refunds on delivered orders from your account.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="legal">&copy; {{ year }} AeroScript</p>
     </footer>
   </mat-sidenav-content>
 </mat-sidenav-container>
@@ -122,6 +181,12 @@
   <a mat-menu-item routerLink="/account"><mat-icon>person</mat-icon><span>Account</span></a>
   <a mat-menu-item routerLink="/account/orders"><mat-icon>receipt_long</mat-icon><span>Orders</span></a>
   <a mat-menu-item routerLink="/account/wishlist"><mat-icon>favorite</mat-icon><span>Wishlist</span></a>
+  @if (isSeller()) {
+    <a mat-menu-item routerLink="/seller"><mat-icon>inventory_2</mat-icon><span>Seller hub</span></a>
+  }
+  @if (isAdmin()) {
+    <a mat-menu-item routerLink="/admin"><mat-icon>admin_panel_settings</mat-icon><span>Admin</span></a>
+  }
   <mat-divider />
   <button mat-menu-item type="button" (click)="logout()"><mat-icon>logout</mat-icon><span>Sign out</span></button>
 </mat-menu>

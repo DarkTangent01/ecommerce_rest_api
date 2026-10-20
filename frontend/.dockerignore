@@ -1,0 +1,11 @@
+node_modules
+dist
+.angular
+coverage
+test-results
+playwright-report
+blob-report
+e2e/.seed.json
+e2e/.uploads-baseline.json
+.env
+.env.*

@@ -20,7 +20,7 @@ export interface ReasonDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title>{{ data.title }}</h2>
-    <form (ngSubmit)="confirm()">
+    <form (submit)="$event.preventDefault(); confirm()">
       <mat-dialog-content>
         <p>{{ data.description }}</p>
         <mat-form-field class="full">

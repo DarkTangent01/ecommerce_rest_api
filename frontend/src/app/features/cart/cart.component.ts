@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { filter, switchMap } from 'rxjs';
 import { CartStore, type AvailableCartLine } from '../../core/cart/cart.store';
 import { RULES } from '../../core/config/validation';
+import { WishlistStore } from '../../core/wishlist/wishlist.store';
 import { AsyncStateComponent, type ViewState } from '../../shared/components/async-state.component';
 import { ConfirmDialogComponent, type ConfirmDialogData } from '../../shared/components/confirm-dialog.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -24,6 +25,7 @@ export class CartComponent {
   readonly cart = inject(CartStore);
   private readonly dialog = inject(MatDialog);
   private readonly toast = inject(ToastService);
+  private readonly wishlist = inject(WishlistStore);
 
   readonly state = computed<ViewState>(() => {
     const status = this.cart.status();
@@ -48,6 +50,14 @@ export class CartComponent {
 
   remove(productId: string, name: string): void {
     this.cart.remove(productId).subscribe(() => this.toast.show(`Removed ${name} from your cart.`, 'success'));
+  }
+
+  /** Saves to the wishlist first, then removes from the cart, so a failure never loses the item. */
+  moveToWishlist(productId: string, name: string): void {
+    this.wishlist
+      .save(productId)
+      .pipe(switchMap(() => this.cart.remove(productId)))
+      .subscribe(() => this.toast.show(`Moved ${name} to your wishlist.`, 'success'));
   }
 
   removeUnavailable(): void {

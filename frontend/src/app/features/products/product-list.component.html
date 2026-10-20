@@ -1,88 +1,153 @@
 <div class="page">
-  <header class="page-header">
-    <div>
-      <p class="eyebrow">Shop</p>
-      <h1>{{ heading() }}</h1>
-      @if (meta(); as m) {
-        <p aria-live="polite">{{ m.total }} {{ m.total === 1 ? 'product' : 'products' }}</p>
+  <header class="list-header">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a routerLink="/">Home</a>
+      <span aria-hidden="true">/</span>
+      <a routerLink="/products" [attr.aria-current]="query().category ? null : 'page'">All products</a>
+      @if (categoryLabel(); as label) {
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{{ label }}</span>
       }
-    </div>
+    </nav>
+    <h1>{{ heading() }}</h1>
   </header>
 
-  <form class="filters surface" [formGroup]="filters" (ngSubmit)="applyFilters()" aria-label="Filter products">
-    <mat-form-field class="search">
-      <mat-label>Search</mat-label>
-      <mat-icon matPrefix aria-hidden="true">search</mat-icon>
-      <input matInput formControlName="q" type="search" maxlength="100" />
-    </mat-form-field>
-
-    <mat-form-field>
-      <mat-label>Category</mat-label>
-      <mat-select formControlName="category">
-        <mat-option value="">All categories</mat-option>
-        @for (category of categories; track category.value) {
-          <mat-option [value]="category.value">{{ category.label }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field>
-      <mat-label>Min price</mat-label>
-      <input matInput formControlName="minPrice" type="number" min="0" inputmode="decimal" />
-      @if (filters.controls.minPrice.invalid) {
-        <mat-error>Must be 0 or more.</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field>
-      <mat-label>Max price</mat-label>
-      <input matInput formControlName="maxPrice" type="number" min="0" inputmode="decimal" />
-      @if (filters.controls.maxPrice.invalid) {
-        <mat-error>Must be 0 or more.</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field>
-      <mat-label>Sort by</mat-label>
-      <mat-select formControlName="sort">
-        @for (option of sortOptions; track option.value) {
-          <mat-option [value]="option.value">{{ option.label }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <div class="filter-actions">
-      <button mat-flat-button type="submit">Apply</button>
-      <button mat-button type="button" (click)="clearFilters()">Clear</button>
-    </div>
-  </form>
-
-  <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading products" (retry)="results.reload()">
-    @if (products().length) {
-      <div class="product-grid" [class.reloading]="results.isLoading()">
-        @for (product of products(); track product._id) {
-          <app-product-card
-            [product]="product"
-            [saved]="wishlist.has(product._id)"
-            (addToCart)="addToCart($event)"
-            (toggleWishlist)="toggleWishlist($event)"
-          />
-        }
+  <div class="layout">
+    <aside class="sidebar" [class.open]="filtersOpen()" id="product-filters" aria-label="Filters">
+      <div class="sidebar-head">
+        <h2>Filters</h2>
+        <button mat-icon-button type="button" class="close-filters" aria-label="Close filters" (click)="filtersOpen.set(false)">
+          <mat-icon>close</mat-icon>
+        </button>
       </div>
-      @if (meta(); as m) {
-        <mat-paginator
-          [length]="m.total"
-          [pageIndex]="m.page - 1"
-          [pageSize]="m.limit"
-          [pageSizeOptions]="pageSizes"
-          (page)="changePage($event)"
-          aria-label="Choose page"
-        />
+
+      <section class="facet" aria-labelledby="facet-category">
+        <h3 id="facet-category">Category</h3>
+        <ul>
+          <li>
+            <a routerLink="/products" [queryParams]="categoryLink(null)" queryParamsHandling="merge" [class.active]="!query().category">
+              All categories
+            </a>
+          </li>
+          @for (category of categories; track category.value) {
+            <li>
+              <a
+                routerLink="/products"
+                [queryParams]="categoryLink(category.value)"
+                queryParamsHandling="merge"
+                [class.active]="query().category === category.value"
+                [attr.aria-current]="query().category === category.value ? 'true' : null"
+              >
+                {{ category.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+
+      <form class="facet" [formGroup]="filters" (ngSubmit)="applyFilters()" aria-labelledby="facet-refine">
+        <h3 id="facet-refine">Refine</h3>
+        <mat-form-field class="full" subscriptSizing="dynamic">
+          <mat-label>Search within results</mat-label>
+          <input matInput formControlName="q" type="search" maxlength="100" />
+        </mat-form-field>
+        <div class="price-range">
+          <mat-form-field subscriptSizing="dynamic">
+            <mat-label>Min price</mat-label>
+            <input matInput formControlName="minPrice" type="number" min="0" inputmode="decimal" />
+            @if (filters.controls.minPrice.invalid) {
+              <mat-error>Must be 0 or more.</mat-error>
+            }
+          </mat-form-field>
+          <mat-form-field subscriptSizing="dynamic">
+            <mat-label>Max price</mat-label>
+            <input matInput formControlName="maxPrice" type="number" min="0" inputmode="decimal" />
+            @if (filters.controls.maxPrice.invalid) {
+              <mat-error>Must be 0 or more.</mat-error>
+            }
+          </mat-form-field>
+        </div>
+        @if (filters.errors?.['priceRange']) {
+          <p class="range-error" role="alert">Max price must be at least the min price.</p>
+        }
+        <button mat-flat-button type="submit">Apply</button>
+      </form>
+    </aside>
+
+    <section class="results" aria-labelledby="results-count">
+      <div class="toolbar">
+        <p id="results-count" class="count" aria-live="polite">
+          @if (meta(); as m) {
+            <strong>{{ m.total }}</strong> {{ m.total === 1 ? 'result' : 'results' }}
+          } @else {
+            Searching…
+          }
+        </p>
+        <button
+          mat-stroked-button
+          type="button"
+          class="open-filters"
+          aria-controls="product-filters"
+          [attr.aria-expanded]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <mat-icon>tune</mat-icon> Filters
+          @if (activeFilters().length) {
+            ({{ activeFilters().length }})
+          }
+        </button>
+        <mat-form-field class="sort" subscriptSizing="dynamic">
+          <mat-label>Sort by</mat-label>
+          <mat-select [formControl]="filters.controls.sort">
+            @for (option of sortOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      @if (activeFilters().length) {
+        <ul class="chips" aria-label="Active filters">
+          @for (chip of activeFilters(); track chip.key) {
+            <li>
+              <button type="button" class="chip" (click)="removeFilter(chip.key)" [attr.aria-label]="'Remove filter ' + chip.label">
+                {{ chip.label }} <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </li>
+          }
+          <li><button type="button" class="clear-all" (click)="clearFilters()">Clear all</button></li>
+        </ul>
       }
-    } @else {
-      <app-empty-state icon="search_off" title="No products match" description="Try a different search, category or price range.">
-        <button mat-stroked-button type="button" (click)="clearFilters()">Clear filters</button>
-      </app-empty-state>
-    }
-  </app-async-state>
+
+      <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading products" (retry)="results.reload()">
+        <div asLoading class="product-grid"><app-product-skeleton [count]="8" /></div>
+        @if (products().length) {
+          <div class="product-grid" [class.reloading]="results.isLoading()">
+            @for (product of products(); track product._id) {
+              <app-product-card
+                [product]="product"
+                [saved]="wishlist.has(product._id)"
+                (addToCart)="addToCart($event)"
+                (toggleWishlist)="toggleWishlist($event)"
+              />
+            }
+          </div>
+          @if (meta(); as m) {
+            <mat-paginator
+              [length]="m.total"
+              [pageIndex]="m.page - 1"
+              [pageSize]="m.limit"
+              [pageSizeOptions]="pageSizes"
+              (page)="changePage($event)"
+              aria-label="Choose page"
+            />
+          }
+        } @else {
+          <app-empty-state icon="search_off" title="No products match" description="Try a different search, category or price range.">
+            <button mat-stroked-button type="button" (click)="clearFilters()">Clear filters</button>
+          </app-empty-state>
+        }
+      </app-async-state>
+    </section>
+  </div>
 </div>

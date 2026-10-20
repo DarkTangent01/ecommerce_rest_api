@@ -66,6 +66,18 @@
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
+                @if (line.product.isActive) {
+                  <button
+                    mat-button
+                    type="button"
+                    class="move"
+                    [disabled]="cart.isBusy(line.product._id)"
+                    (click)="moveToWishlist(line.product._id, line.product.name)"
+                    [attr.aria-label]="'Move ' + line.product.name + ' to wishlist'"
+                  >
+                    <mat-icon>favorite_border</mat-icon> Move to wishlist
+                  </button>
+                }
                 <button
                   mat-icon-button
                   type="button"

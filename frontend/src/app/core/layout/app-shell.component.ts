@@ -1,8 +1,5 @@
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatBadgeModule } from '@angular/material/badge';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,13 +7,14 @@ import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter, map } from 'rxjs';
+import { filter, map, startWith } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { CartStore } from '../cart/cart.store';
-import { APP_SETTINGS } from '../config/app.config';
+import { CATEGORIES } from '../config/catalog';
 import { LoadingService } from '../loading/loading.service';
+import { LogoComponent } from '../../shared/ui/logo.component';
+import { SearchBoxComponent } from './search-box.component';
 
 @Component({
   selector: 'app-shell',
@@ -24,16 +22,15 @@ import { LoadingService } from '../loading/loading.service';
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
-    ReactiveFormsModule,
-    MatToolbarModule,
     MatButtonModule,
     MatIconModule,
-    MatBadgeModule,
     MatMenuModule,
     MatSidenavModule,
     MatListModule,
     MatDividerModule,
     MatProgressBarModule,
+    LogoComponent,
+    SearchBoxComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.component.html',
@@ -43,29 +40,40 @@ export class AppShellComponent {
   readonly auth = inject(AuthService);
   readonly cart = inject(CartStore);
   readonly loading = inject(LoadingService);
-  readonly appName = inject(APP_SETTINGS).appName;
   private readonly router = inject(Router);
   private readonly main = viewChild.required<ElementRef<HTMLElement>>('main');
 
-  readonly isHandset = toSignal(inject(BreakpointObserver).observe('(max-width: 767.98px)').pipe(map((state) => state.matches)), {
-    initialValue: false,
-  });
+  readonly categories = CATEGORIES;
+  readonly year = new Date().getFullYear();
   readonly drawerOpen = signal(false);
   readonly isAdmin = computed(() => this.auth.hasRole('admin'));
   readonly isSeller = computed(() => this.auth.hasRole('seller', 'admin'));
-  readonly search = new FormControl('', { nonNullable: true });
+  readonly firstName = computed(() => this.auth.user()?.name.split(/\s+/)[0] ?? '');
+  readonly cartLabel = computed(() => {
+    const count = this.cart.count();
+    return `Cart, ${count} ${count === 1 ? 'item' : 'items'}`;
+  });
+
+  private readonly navigations = this.router.events.pipe(filter((event) => event instanceof NavigationEnd));
+  /** Highlights the category tab while browsing that category. */
+  readonly activeCategory = toSignal(
+    this.navigations.pipe(
+      startWith(null),
+      map(() => {
+        const tree = this.router.parseUrl(this.router.url);
+        const onProducts = tree.root.children['primary']?.segments.map((s) => s.path).join('/') === 'products';
+        return onProducts ? ((tree.queryParams['category'] as string | undefined) ?? null) : null;
+      }),
+    ),
+    { initialValue: null },
+  );
 
   constructor() {
     // After each navigation: close the drawer and move focus to the new page for screen readers.
-    this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
+    this.navigations.pipe(takeUntilDestroyed()).subscribe(() => {
       this.drawerOpen.set(false);
       queueMicrotask(() => this.main().nativeElement.focus({ preventScroll: true }));
     });
-  }
-
-  submitSearch(): void {
-    const q = this.search.value.trim();
-    void this.router.navigate(['/products'], { queryParams: { q: q || null } });
   }
 
   skipToContent(event: Event): void {

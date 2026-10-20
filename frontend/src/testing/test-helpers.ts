@@ -5,7 +5,7 @@ import type { Cart, Order, Product, User } from '../app/core/models';
 
 export const API = '/api/v1';
 
-export const testSettings: AppSettings = { apiBaseUrl: API, tenantId: 'acme', currency: 'USD', appName: 'ShopSphere' };
+export const testSettings: AppSettings = { apiBaseUrl: API, tenantId: 'acme', currency: 'USD', appName: 'AeroScript' };
 
 export interface ToastSpy {
   show: ReturnType<typeof vi.fn>;

@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,14 +8,17 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { map, of } from 'rxjs';
 import { ProductsApi } from '../../core/api/products.api';
 import { ReviewsApi } from '../../core/api/catalog-extras.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartActions } from '../../core/cart/cart-actions.service';
 import { RULES } from '../../core/config/validation';
 import { ApiError } from '../../core/http/api-error';
-import type { ProductVariant, Review } from '../../core/models';
+import type { Product, ProductVariant, Review } from '../../core/models';
+import { RecentlyViewedStore } from '../../core/catalog/recently-viewed.store';
+import { ProductRailComponent } from '../../shared/components/product-rail.component';
 import { AppTitleStrategy } from '../../core/routing/title.strategy';
 import { WishlistStore } from '../../core/wishlist/wishlist.store';
 import { AsyncStateComponent } from '../../shared/components/async-state.component';
@@ -28,6 +31,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { errorMessageOf, viewStateOf } from '../../shared/resource-state';
 
 const REVIEWS_PAGE_SIZE = 5;
+const RELATED_LIMIT = 10;
 
 @Component({
   selector: 'app-product-detail',
@@ -45,6 +49,7 @@ const REVIEWS_PAGE_SIZE = 5;
     EmptyStateComponent,
     RatingStarsComponent,
     StockBadgeComponent,
+    ProductRailComponent,
     MoneyPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +65,8 @@ export class ProductDetailComponent {
   private readonly fb = inject(NonNullableFormBuilder);
   readonly auth = inject(AuthService);
   readonly wishlist = inject(WishlistStore);
+  private readonly router = inject(Router);
+  private readonly recentlyViewed = inject(RecentlyViewedStore);
 
   /** Route parameter, bound by withComponentInputBinding(). */
   readonly id = input.required<string>();
@@ -75,6 +82,17 @@ export class ProductDetailComponent {
   });
   readonly reviewsState = computed(() => viewStateOf(this.reviews));
   readonly reviewsPageSize = REVIEWS_PAGE_SIZE;
+
+  readonly imageFailed = signal(false);
+
+  /** Same-category products, without the one being viewed. */
+  readonly relatedProducts = rxResource({
+    params: () => this.product.value()?.category ?? null,
+    stream: ({ params }) =>
+      params ? this.productsApi.list({ category: params, limit: RELATED_LIMIT + 1 }).pipe(map((page) => page.items)) : of([] as Product[]),
+  });
+  readonly related = computed(() => (this.relatedProducts.value() ?? []).filter((p) => p._id !== this.id()).slice(0, RELATED_LIMIT));
+  readonly relatedState = computed(() => viewStateOf(this.relatedProducts));
 
   readonly quantity = signal(1);
   /** Quantity choices: 1..stock, capped at the cart's 10-per-click convenience (the API allows up to 999). */
@@ -97,7 +115,21 @@ export class ProductDetailComponent {
   constructor() {
     effect(() => {
       const product = this.product.value();
-      if (product) this.titles.setPageTitle(product.name);
+      if (product) {
+        this.titles.setPageMeta({
+          title: product.name,
+          description: product.description || `${product.name} on AeroScript.`,
+          image: product.image,
+          type: 'product',
+        });
+      }
+    });
+    effect(() => {
+      // A new product: reset per-product UI and remember it for "Recently viewed".
+      const id = this.id();
+      this.imageFailed.set(false);
+      this.quantity.set(1);
+      untracked(() => this.recentlyViewed.record(id));
     });
   }
 
@@ -116,6 +148,23 @@ export class ProductDetailComponent {
     this.cartActions.add(product._id, this.quantity()).subscribe({
       complete: () => this.adding.set(false),
     });
+  }
+
+  /** Adds to the cart, then goes straight to checkout (only if the add succeeded). */
+  buyNow(): void {
+    const product = this.product.value();
+    if (!product) return;
+    this.adding.set(true);
+    this.cartActions.add(product._id, this.quantity()).subscribe({
+      next: (added) => {
+        if (added) void this.router.navigateByUrl('/checkout');
+      },
+      complete: () => this.adding.set(false),
+    });
+  }
+
+  addRelated(product: Product): void {
+    this.cartActions.add(product._id).subscribe();
   }
 
   toggleWishlist(): void {

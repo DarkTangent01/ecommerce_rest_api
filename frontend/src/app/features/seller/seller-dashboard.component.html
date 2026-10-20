@@ -43,6 +43,8 @@
                   <th scope="col">Placed</th>
                   <th scope="col">Status</th>
                   <th scope="col">Payment</th>
+                  <th scope="col">Your items</th>
+                  <th scope="col" class="num">Your subtotal</th>
                   <th scope="col"><span class="visually-hidden">Actions</span></th>
                 </tr>
               </thead>
@@ -53,6 +55,12 @@
                     <td>{{ order.createdAt | date: 'short' }}</td>
                     <td><app-status-chip [status]="order.status" /></td>
                     <td><app-status-chip [status]="order.paymentStatus" /></td>
+                    <td>
+                      @for (item of order.items; track item.product) {
+                        <span class="line-item">{{ item.quantity }} × {{ item.name }}</span>
+                      }
+                    </td>
+                    <td class="num">{{ order.sellerSubtotal | money }}</td>
                     <td class="num">
                       @if (canShip(order)) {
                         <button mat-stroked-button type="button" (click)="ship(order)"><mat-icon>local_shipping</mat-icon> Ship</button>

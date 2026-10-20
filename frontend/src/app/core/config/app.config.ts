@@ -15,6 +15,6 @@ export const APP_SETTINGS = new InjectionToken<AppSettings>('APP_SETTINGS', {
     apiBaseUrl: environment.apiBaseUrl.replace(/\/$/, ''),
     tenantId: environment.tenantId,
     currency: environment.currency,
-    appName: 'ShopSphere',
+    appName: 'AeroScript',
   }),
 });

@@ -1,90 +1,155 @@
+@use 'tokens' as t;
+
 .breadcrumbs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  font: var(--mat-sys-body-small);
+  flex-wrap: wrap;
+  gap: var(--as-space-2);
+  margin-bottom: var(--as-space-4);
+  font-size: var(--as-text-sm);
+  color: var(--as-text-muted);
   text-transform: capitalize;
+
+  a {
+    color: var(--as-text-muted);
+  }
 }
 
 .product {
   display: grid;
-  gap: 24px;
+  gap: var(--as-space-6);
+  padding: var(--as-space-5);
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  border-radius: var(--as-radius-lg);
 
-  @media (min-width: 900px) {
-    grid-template-columns: 1.1fr 1fr;
-    gap: 48px;
+  @include t.up(t.$bp-lg) {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--as-space-10);
+    padding: var(--as-space-8);
   }
 }
 
-.gallery img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: 24px;
-  background: var(--mat-sys-surface-container);
+.gallery {
+  @include t.up(t.$bp-lg) {
+    position: sticky;
+    top: 128px;
+    align-self: start;
+  }
+
+  img,
+  .image-fallback {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--as-radius-md);
+    background: var(--as-gray-50);
+  }
+
+  .image-fallback {
+    display: grid;
+    place-items: center;
+    color: var(--as-gray-400);
+
+    mat-icon {
+      width: 48px;
+      height: 48px;
+      font-size: 48px;
+    }
+  }
 }
 
 .buy-box {
   display: grid;
-  gap: 12px;
+  gap: var(--as-space-3);
   align-content: start;
 
   h1 {
-    font: var(--mat-sys-headline-medium);
+    font-size: var(--as-text-2xl);
   }
 }
 
 .price {
-  font: var(--mat-sys-headline-small);
-  margin: 0;
+  margin: var(--as-space-1) 0 0;
+  font-size: var(--as-text-2xl);
+  font-weight: var(--as-weight-bold);
 }
 
 .purchase {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
+  display: grid;
+  gap: var(--as-space-3);
+  padding: var(--as-space-4);
+  border: 1px solid var(--as-border);
+  border-radius: var(--as-radius-md);
+  background: var(--as-gray-50);
 
   .qty {
-    width: 120px;
+    width: 140px;
   }
 
-  .add {
-    height: 56px;
-    flex: 1;
-    min-width: 200px;
+  .buttons {
+    display: grid;
+    gap: var(--as-space-2);
+
+    @include t.up(t.$bp-sm) {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    button {
+      height: 48px;
+    }
+  }
+}
+
+.delivery {
+  display: flex;
+  align-items: center;
+  gap: var(--as-space-2);
+  margin: 0;
+
+  mat-icon {
+    color: var(--as-brand-600);
   }
 }
 
 .section-title {
-  margin-top: 12px;
-  font: var(--mat-sys-title-medium);
+  margin-top: var(--as-space-3);
+  font-size: var(--as-text-lg);
 }
 
 .description {
   margin: 0;
   white-space: pre-line;
+  color: var(--as-gray-800);
 }
 
 .variants {
   margin: 0;
-  padding-left: 20px;
+  padding-left: var(--as-space-5);
 }
 
 .small {
-  font: var(--mat-sys-body-small);
+  font-size: var(--as-text-sm);
+}
+
+.related {
+  display: block;
+  margin-top: var(--as-space-6);
 }
 
 .reviews {
-  margin-top: 48px;
+  margin-top: var(--as-space-6);
+  padding: var(--as-space-5);
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  border-radius: var(--as-radius-lg);
 }
 
 .reviews-layout {
   display: grid;
-  gap: 24px;
-  margin-top: 16px;
+  gap: var(--as-space-6);
+  margin-top: var(--as-space-4);
 
-  @media (min-width: 900px) {
+  @include t.up(t.$bp-lg) {
     grid-template-columns: 1.4fr 1fr;
   }
 }
@@ -94,29 +159,34 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 16px;
+  gap: var(--as-space-4);
 }
 
 .review {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  padding-bottom: var(--as-space-4);
+  border-bottom: 1px solid var(--as-border);
 
   h3 {
-    margin: 6px 0 4px;
+    margin: 6px 0 var(--as-space-1);
   }
 
   p {
-    margin: 4px 0;
+    margin: var(--as-space-1) 0;
   }
 }
 
-.review-form form {
-  display: grid;
-  gap: 4px;
-  margin-top: 12px;
+.review-form {
+  box-shadow: none;
+  background: var(--as-gray-50);
+
+  form {
+    display: grid;
+    gap: var(--as-space-1);
+    margin-top: var(--as-space-3);
+  }
 }
 
 .form-error {
-  color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  color: var(--as-danger-700);
+  margin: 0 0 var(--as-space-2);
 }

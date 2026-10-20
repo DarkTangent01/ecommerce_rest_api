@@ -45,6 +45,11 @@ export class WishlistStore {
     return request.pipe(tap((wishlist) => this.adopt(wishlist)));
   }
 
+  /** Idempotent add (the API's $addToSet), unlike toggle(): saving an already-saved product keeps it. */
+  save(productId: Id): Observable<Wishlist> {
+    return this.api.add(productId).pipe(tap((wishlist) => this.adopt(wishlist)));
+  }
+
   reset(): void {
     this.products.set([]);
     this.status.set('idle');

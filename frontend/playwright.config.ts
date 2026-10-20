@@ -24,7 +24,8 @@ export default defineConfig({
   webServer: [
     {
       command: 'node e2e/support/backend.mjs',
-      url: 'http://127.0.0.1:5000/api/v1/ready',
+      // E2E_API_PORT moves the seeded API off 5000 (backend.mjs and serve-dist.mjs read it too).
+      url: `http://127.0.0.1:${process.env['E2E_API_PORT'] ?? '5000'}/api/v1/ready`,
       timeout: 180_000,
       reuseExistingServer: !process.env['CI'],
       stdout: 'pipe',

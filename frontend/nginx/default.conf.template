@@ -1,0 +1,73 @@
+# AeroScript static hosting + API gateway. Rendered by the nginx image's envsubst at start-up:
+# only ${API_UPSTREAM} is substituted (nginx's own $variables are left alone).
+
+server {
+  listen 8080;
+  server_name _;
+  root /usr/share/nginx/html;
+
+  server_tokens off;
+  client_max_body_size 6m; # product images are capped at 5 MB by the API
+
+  gzip on;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+  gzip_min_length 1024;
+
+  # Security headers for every response. script-src is enforced by the hash-based CSP that the
+  # Angular build (autoCsp) puts in index.html; this header adds what a <meta> CSP cannot carry.
+  add_header Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+  add_header X-Frame-Options "DENY" always;
+
+  location = /healthz {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  # API and product images. X-Forwarded-For is *replaced* with the connecting client's address,
+  # never appended to, so a client cannot inject its own; the API trusts exactly this one hop
+  # (TRUST_PROXY=1).
+  location /api/ {
+    proxy_pass ${API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+    # Server-sent events (/api/v1/platform/stream): no buffering, long reads.
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+  }
+
+  location /uploads/ {
+    proxy_pass ${API_UPSTREAM};
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    expires 7d;
+  }
+
+  # Hashed build output: cache for a year.
+  location ~* \.(?:js|css|woff2?|ttf)$ {
+    expires 1y;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    try_files $uri =404;
+  }
+
+  # The app shell must always be revalidated so a deploy is picked up immediately.
+  location = /index.html {
+    add_header Cache-Control "no-cache" always;
+    add_header Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "DENY" always;
+  }
+
+  # SPA fallback: client-side routes are served index.html.
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

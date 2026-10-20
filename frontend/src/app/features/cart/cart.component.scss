@@ -21,7 +21,7 @@
   grid-template-columns: 72px 1fr auto;
   grid-template-areas:
     'img info remove'
-    'img qty qty';
+    'img qty move';
   gap: 8px 12px;
   align-items: center;
   padding: 12px;
@@ -38,8 +38,8 @@
   }
 
   @media (min-width: 640px) {
-    grid-template-columns: 96px 1fr auto auto;
-    grid-template-areas: 'img info qty remove';
+    grid-template-columns: 96px 1fr auto auto auto;
+    grid-template-areas: 'img info qty move remove';
 
     img {
       width: 96px;
@@ -83,6 +83,11 @@
 
 .remove {
   grid-area: remove;
+}
+
+.move {
+  grid-area: move;
+  justify-self: end;
 }
 
 .unavailable-label {

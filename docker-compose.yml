@@ -1,0 +1,57 @@
+# Local / single-host deployment: MongoDB, the API and the AeroScript web app.
+#
+#   cp .env.example .env    # then set the five secrets (see docs/security-deployment-checklist.md)
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# Only the web container is published. Browsers talk to nginx, which serves the app and proxies
+# /api and /uploads to the API over the compose network (http://api:5000), so the API is never
+# reached directly and TRUST_PROXY=1 (one trusted hop: nginx) is correct.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      APP_IP_ADDRESS: 0.0.0.0
+      APP_PORT: 5000
+      DB_URL: mongodb://mongo:27017/ecommerce_rest_api
+      TRUST_PROXY: "1"
+      APP_URL: ${PUBLIC_URL:-http://localhost:8080}
+      CORS_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Not published: only reachable through the web container.
+    expose:
+      - "5000"
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+  uploads:

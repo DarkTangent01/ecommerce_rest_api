@@ -2,6 +2,8 @@
   <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading product" (retry)="product.reload()">
     @if (product.value(); as item) {
       <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a routerLink="/">Home</a>
+        <span aria-hidden="true">/</span>
         <a routerLink="/products">Products</a>
         @if (item.category) {
           <span aria-hidden="true">/</span>
@@ -11,7 +13,13 @@
 
       <article class="product">
         <div class="gallery">
-          <img [src]="item.image" [alt]="item.name" width="640" height="640" />
+          @if (imageFailed() || !item.image) {
+            <div class="image-fallback" role="img" [attr.aria-label]="item.name + ' (image unavailable)'">
+              <mat-icon aria-hidden="true">image_not_supported</mat-icon>
+            </div>
+          } @else {
+            <img [src]="item.image" [alt]="item.name" width="640" height="640" fetchpriority="high" (error)="imageFailed.set(true)" />
+          }
         </div>
 
         <section class="buy-box" aria-labelledby="product-name">
@@ -35,11 +43,20 @@
                   }
                 </mat-select>
               </mat-form-field>
-              <button mat-flat-button type="button" class="add" [disabled]="adding()" (click)="addToCart()">
-                <mat-icon>add_shopping_cart</mat-icon>
-                {{ auth.isAuthenticated() ? 'Add to cart' : 'Sign in to buy' }}
-              </button>
+              <div class="buttons">
+                <button mat-flat-button type="button" class="add" [disabled]="adding()" (click)="addToCart()">
+                  <mat-icon>add_shopping_cart</mat-icon>
+                  {{ auth.isAuthenticated() ? 'Add to cart' : 'Sign in to buy' }}
+                </button>
+                @if (auth.isAuthenticated()) {
+                  <button mat-flat-button type="button" class="as-buy" [disabled]="adding()" (click)="buyNow()">Buy now</button>
+                }
+              </div>
             </div>
+            <p class="delivery muted small">
+              <mat-icon aria-hidden="true">local_shipping</mat-icon>
+              Shipping and the final total are confirmed at checkout.
+            </p>
           }
 
           <button mat-stroked-button type="button" (click)="toggleWishlist()" [attr.aria-pressed]="wishlist.has(item._id)">
@@ -68,6 +85,17 @@
           }
         </section>
       </article>
+
+      <app-product-rail
+        class="related"
+        title="More in this category"
+        [products]="related()"
+        [state]="relatedState()"
+        [seeAllQuery]="item.category ? { category: item.category } : null"
+        (retry)="relatedProducts.reload()"
+        (addToCart)="addRelated($event)"
+        (toggleWishlist)="wishlist.toggle($event._id).subscribe()"
+      />
 
       <section class="reviews" aria-labelledby="reviews-title">
         <h2 id="reviews-title">Customer reviews</h2>

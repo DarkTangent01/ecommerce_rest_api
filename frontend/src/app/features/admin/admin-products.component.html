@@ -16,7 +16,7 @@
     </section>
   }
 
-  <form class="toolbar" (ngSubmit)="applySearch()" role="search">
+  <form class="toolbar" (submit)="$event.preventDefault(); applySearch()" role="search">
     <mat-form-field>
       <mat-label>Search products</mat-label>
       <mat-icon matPrefix aria-hidden="true">search</mat-icon>

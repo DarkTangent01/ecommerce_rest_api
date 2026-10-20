@@ -28,6 +28,8 @@ describe('CartComponent', () => {
     for (const req of http.match(`${API}/cart`)) req.flush(envelope(aCart([{ product: mug, quantity: 2 }, { product: lamp, quantity: 3 }])));
     await fixture.whenStable();
     for (const req of http.match(`${API}/cart`)) req.flush(envelope(aCart([{ product: mug, quantity: 2 }, { product: lamp, quantity: 3 }])));
+    // The wishlist store also loads on sign-in (the cart can move lines into it).
+    for (const req of http.match(`${API}/wishlist`)) req.flush(envelope({ _id: 'w1', user: 'u1', products: [] }));
     await fixture.whenStable();
   });
 
@@ -53,6 +55,21 @@ describe('CartComponent', () => {
     await fixture.whenStable();
 
     expect(button('Increase quantity of Ceramic Mug').disabled).toBe(true);
+  });
+
+  it('moves a line to the wishlist: saves it first, then removes it from the cart', async () => {
+    button('Move Desk Lamp to wishlist').click();
+    const save = http.expectOne(`${API}/wishlist/p2`);
+    expect(save.request.method).toBe('POST');
+    // Nothing is removed until the save succeeded.
+    http.expectNone(`${API}/cart/items/p2`);
+    save.flush(envelope({ _id: 'w1', user: 'u1', products: [lamp] }));
+
+    const remove = http.expectOne(`${API}/cart/items/p2`);
+    expect(remove.request.method).toBe('DELETE');
+    remove.flush(envelope(aCart([{ product: mug, quantity: 2 }])));
+    await fixture.whenStable();
+    expect(el().textContent).not.toContain('Desk Lamp');
   });
 
   it('removes a line', async () => {

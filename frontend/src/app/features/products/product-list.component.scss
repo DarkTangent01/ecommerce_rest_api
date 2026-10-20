@@ -1,41 +1,202 @@
-.filters {
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: 1fr 1fr;
-  margin-bottom: 24px;
-  padding: 16px 16px 4px;
+@use 'tokens' as t;
 
-  .search {
-    grid-column: 1 / -1;
+.list-header {
+  margin-bottom: var(--as-space-5);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--as-space-2);
+  margin-bottom: var(--as-space-2);
+  font-size: var(--as-text-sm);
+  color: var(--as-text-muted);
+
+  a {
+    color: var(--as-text-muted);
+  }
+}
+
+.layout {
+  display: grid;
+  gap: var(--as-space-6);
+  align-items: start;
+
+  @include t.up(t.$bp-lg) {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+// ---- Filters ------------------------------------------------------------------------------
+
+.sidebar {
+  display: grid;
+  gap: var(--as-space-5);
+  padding: var(--as-space-5);
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  border-radius: var(--as-radius-lg);
+
+  @include t.up(t.$bp-lg) {
+    position: sticky;
+    top: 128px;
   }
 
-  @media (min-width: 960px) {
-    grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr auto;
+  // Phones and tablets: a panel the "Filters" button opens.
+  @include t.down(t.$bp-lg) {
+    display: none;
 
-    .search {
-      grid-column: auto;
+    &.open {
+      display: grid;
     }
   }
 }
 
-.filter-actions {
+.sidebar-head {
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding-top: 8px;
-  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+}
 
-  @media (min-width: 960px) {
-    grid-column: auto;
+.close-filters {
+  @include t.up(t.$bp-lg) {
+    display: none;
   }
+}
+
+.facet {
+  display: grid;
+  gap: var(--as-space-3);
+
+  h3 {
+    font-family: var(--as-font-sans);
+    font-size: var(--as-text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--as-text-muted);
+  }
+
+  ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  a {
+    display: block;
+    padding: 6px var(--as-space-2);
+    border-radius: var(--as-radius-sm);
+    color: var(--as-text);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--as-gray-100);
+    }
+
+    &.active {
+      background: var(--as-brand-50);
+      color: var(--as-brand-700);
+      font-weight: var(--as-weight-semibold);
+    }
+  }
+}
+
+.price-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--as-space-2);
+}
+
+.range-error {
+  margin: 0;
+  color: var(--as-danger-700);
+  font-size: var(--as-text-sm);
+}
+
+// ---- Results ------------------------------------------------------------------------------
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--as-space-3);
+  margin-bottom: var(--as-space-3);
+}
+
+.count {
+  margin: 0;
+  margin-right: auto;
+  color: var(--as-text-muted);
+
+  strong {
+    color: var(--as-text);
+  }
+}
+
+.open-filters {
+  @include t.up(t.$bp-lg) {
+    display: none;
+  }
+}
+
+.sort {
+  width: 220px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--as-space-2);
+  margin: 0 0 var(--as-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--as-space-1);
+  min-height: 32px;
+  padding: 0 var(--as-space-2) 0 var(--as-space-3);
+  border: 1px solid var(--as-brand-100);
+  border-radius: var(--as-radius-pill);
+  background: var(--as-brand-50);
+  color: var(--as-brand-700);
+  font: inherit;
+  font-size: var(--as-text-sm);
+  cursor: pointer;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+
+  &:hover {
+    border-color: var(--as-brand-500);
+  }
+}
+
+.clear-all {
+  min-height: 32px;
+  border: 0;
+  background: none;
+  color: var(--as-link);
+  font: inherit;
+  font-size: var(--as-text-sm);
+  font-weight: var(--as-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .reloading {
   opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: opacity var(--as-duration);
 }
 
 mat-paginator {
-  margin-top: 16px;
+  margin-top: var(--as-space-4);
   background: transparent;
 }

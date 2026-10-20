@@ -1,6 +1,11 @@
-# ShopSphere web app (Angular)
+# AeroScript web app (Angular)
 
-Storefront, account area, seller tools and admin console for the e-commerce REST API in the parent folder. It is Angular 22 with standalone components, signals, the `@if`/`@for` control flow, `inject()`, OnPush everywhere and strict TypeScript and templates, plus Angular Material (M3).
+AeroScript is the storefront, account area, seller hub and admin console for the e-commerce REST API in the parent folder. It uses:
+
+- Angular 22 with standalone components and signals;
+- the `@if`/`@for` control flow, `inject()` and OnPush change detection everywhere;
+- strict TypeScript and templates;
+- Angular Material (M3), re-skinned with the AeroScript design tokens.
 
 ## Quick start
 
@@ -12,19 +17,28 @@ npx playwright install chromium   # only needed for E2E
 # Terminal 1: the API with seeded data (in-memory MongoDB, nothing to install)
 node e2e/support/backend.mjs
 
-# Terminal 2: the app on http://localhost:4200 (proxies /api and /uploads to :5000)
+# Terminal 2: the app on http://localhost:4200 (proxies /api and /uploads to :5000, or $E2E_API_PORT)
 npm start
 ```
 
-`backend.mjs` runs the backend from `../src` through the backend's own dev dependencies and does not modify it. It seeds three local test accounts (admin, seller and customer), 12 products, a `WELCOME10` coupon and one paid order. The accounts are written to `e2e/.seed.json` (git-ignored) and only exist in that in-memory database.
+`backend.mjs` runs the backend from `../src` through the backend's own dev dependencies and does not modify it. It seeds:
+
+- three local test accounts (admin, seller and customer);
+- 12 products;
+- a `WELCOME10` coupon;
+- one paid order.
+
+The accounts are written to `e2e/.seed.json` (git-ignored) and exist only in that in-memory database.
 
 To use your own backend instead, start it on port 5000 (`cd .. && yarn dev`). Your MongoDB needs data, and your backend's `CORS_ORIGIN` must include `http://localhost:4200`.
+
+If port 5000 is already taken on your machine, set `E2E_API_PORT=5100`. `backend.mjs`, `serve-dist.mjs` and the Playwright config all read it. The dev server proxy (`proxy.conf.mjs`) follows it too.
 
 ## Scripts
 
 | Script | What it does |
 |---|---|
-| `npm start` | Dev server on :4200 with the API proxy (`proxy.conf.json`) |
+| `npm start` | Dev server on :4200 with the API proxy (`proxy.conf.mjs`) |
 | `npm run build` | Production build into `dist/ecommerce-admin-ui/browser` (hashed CSP included) |
 | `npm run build:dev` | Unoptimized build using `environment.development.ts` |
 | `npm test` | Unit and component tests (Vitest via `@angular/build:unit-test`) |
@@ -34,107 +48,137 @@ To use your own backend instead, start it on port 5000 (`cd .. && yarn dev`). Yo
 | `npm run e2e:prod` | Builds for production and runs the same E2E suite against `dist/`, served behind a proxy (`e2e/support/serve-dist.mjs`) |
 | `npm run format` / `format:check` | Prettier |
 
+## Design system
+
+**Tokens.** All design tokens live in `src/styles/_tokens.scss` as CSS custom properties (`--as-*`):
+
+- brand ink, Aero blue and the warm "flare" used for buy actions;
+- semantic colours, a type scale (Inter for text, Sora for headings) and a 4 px spacing scale;
+- radii, shadows, motion and breakpoint mixins.
+
+**Theme.** `styles.scss` maps the Material M3 theme onto those tokens (`mat.theme-overrides`). Material components and AeroScript components therefore share one palette; there is no second styling system.
+
+**Shared UI:**
+- `app-logo`: the delta-wing mark and wordmark.
+- `app-product-card`: real stock badges, wishlist toggle and an image fallback.
+- `app-product-rail`: scroll-snap shelf with previous/next buttons.
+- `app-product-skeleton`: loading placeholders.
+- `app-async-state`: loading, error and retry states, with an optional skeleton slot.
+- `app-empty-state`, `app-status-chip`, `app-rating-stars`, dialogs and toasts.
+
+The `.as-buy` class marks the flare "buy" button. `.as-skeleton` provides shimmer placeholders.
+
+**Accessibility:**
+- a skip link, and visible focus rings;
+- `prefers-reduced-motion` support;
+- 44 px touch targets in the header;
+- labelled search and scope controls, and a Material autocomplete (ARIA combobox) for suggestions;
+- descriptive button names (for example "Add Trail Water Bottle to cart");
+- focus moves to the new page after each navigation.
+
+## What's where
+
+| Area | Highlights |
+|---|---|
+| Header (`core/layout`) | Sticky dark masthead with a scoped search and debounced suggestions. Older lookups are cancelled with `switchMap`, and Enter submits in-app. It also has the account menu, orders, wishlist, the live cart count and a scrollable category bar, plus a mobile drawer. |
+| Home | Hero with real product photos, category tiles, and rails for New arrivals, Under $30, three category shelves and Recently viewed. |
+| Catalogue | URL-driven search, category and price filters, sort and paging (`rxResource`, so stale requests are cancelled). Also active-filter chips with clear-all, a sidebar that becomes a toggle panel on small screens, and skeleton loading. |
+| Product | Gallery with image fallback, reviews, variants, quantity, Add to cart, Buy now (straight to checkout), and a related-products rail. Recently viewed is recorded in `sessionStorage`, ids only. |
+| Cart | Quantity changes, remove, "Move to wishlist" (saves first, then removes), and an estimated subtotal. Final totals always come from the server. |
+| Checkout and orders | Server totals; an honest unpaid state until the payment provider confirms; cancel and refund rules that match the backend. |
+| Seller and admin | The seller dashboard shows only the seller's own lines and subtotal. Admin has products, orders, coupons and store settings. |
+| SEO (`core/routing/title.strategy.ts`) | Page titles, descriptions, canonical URLs (listings keep only `category`), Open Graph and Twitter tags, product metadata from product data, and `noindex` for sign-in, cart, checkout, account, seller and admin. |
+
 ## Configuration
 
 Everything in `src/environments/*.ts` ships to browsers. **Never put secrets there.** The app needs no secrets or API keys.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `apiBaseUrl` | `/api/v1` | Relative, so the app expects to be served on the same origin as the API: a reverse proxy routes `/api` and `/uploads` to the backend, as `proxy.conf.json` does in development. |
+| `apiBaseUrl` | `/api/v1` | Relative, so the app expects to be served on the same origin as the API: a reverse proxy routes `/api` and `/uploads` to the backend (nginx in production, `proxy.conf.mjs` in development). |
 | `tenantId` | `default` | Sent as `X-Tenant-Id` on public requests. Signed-in users always act in their own tenant (enforced by the backend). |
 | `currency` | `USD` | Display currency for the `money` pipe |
 
-**Production checklist**
-- Serve `dist/ecommerce-admin-ui/browser` with an SPA fallback to `index.html`, and proxy `/api` and `/uploads` to the backend.
-- **Add the site's origin to the backend's `CORS_ORIGIN`, even though the app is same-origin.** Browsers send `Origin` on POST requests and the backend checks it, so unlisted origins get `403 CORS origin denied`. (The E2E suite against the production build caught this.)
-- Set the backend's `APP_URL` to the public origin so product image URLs point at it.
-- Send this CSP as an HTTP header (a meta tag cannot carry `frame-ancestors`). The build already injects a hash-based `script-src` via `autoCsp`.
-  ```
-  default-src 'self'; script-src 'self' 'strict-dynamic' <hashes from dist/index.html>; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self';
-  form-action 'self'; frame-ancestors 'none'
-  ```
-  `style-src 'unsafe-inline'` is needed for Angular component styles. Fonts come from Google Fonts (see TODOs).
+## Deployment
 
-## Folder structure
+**Docker.** `frontend/Dockerfile` builds the production bundle with `node:24-alpine` and serves it with `nginxinc/nginx-unprivileged` (non-root, port 8080). The nginx config is `frontend/nginx/default.conf.template`, rendered at start-up. It provides:
 
-```text
-src/app/
-  core/                 app-wide singletons
-    api/                one typed service per resource (auth, products, cart, orders, reviews/wishlist, account, admin/seller)
-    auth/               AuthService (signal store), TokenStorage
-    cart/  wishlist/    signal stores; CartActions (guest -> sign in -> back)
-    config/             app settings token, validation rules mirrored from the backend's Zod schemas, catalog config
-    guards/             authGuard, guestGuard, roleGuard (adminGuard, sellerGuard)
-    http/               ApiError (normalized errors), HttpContext flags
-    interceptors/       loading -> error -> auth (refresh + retry)
-    layout/             Material app shell
-    models/             API types mirrored from the backend (envelope, error codes, domain, requests)
-    routing/            title + meta strategy
-  shared/
-    components/         async/empty states, product card, rating, stock badge, status chip, dialogs
-    forms/              validators (password rule, https URL, safe returnUrl) and error helpers
-    pipes/              money
-  features/             lazy-loaded pages: products (home, list, detail, wishlist), auth, cart,
-                        checkout (+ confirmation), orders, profile, seller, admin, errors (404/403)
-src/testing/            test helpers and builders (excluded from the app build)
-e2e/                    Playwright specs and support (seeded backend, prod server, fixtures)
+- SPA fallback to `index.html`;
+- a year of immutable caching for hashed assets, and `no-cache` for `index.html`;
+- security headers (`frame-ancestors 'none'`, `nosniff` and others), alongside the build's hash-based `script-src` CSP;
+- gzip;
+- `GET /healthz`.
+
+`/api` and `/uploads` are proxied to `API_UPSTREAM`, the API as the **container network** sees it, never `localhost`. Nginx replaces `X-Forwarded-For` with the real client address, so the backend should run with `TRUST_PROXY=1`.
+
+```bash
+docker build -t aeroscript-web frontend
+docker run -p 8080:8080 -e API_UPSTREAM=http://api:5000 aeroscript-web
 ```
+
+**Whole stack.** The root `docker-compose.yml` runs MongoDB, the API and the web app. Only the web container is published.
+
+```bash
+cp .env.example .env   # set the five secrets first
+docker compose up --build
+# open http://localhost:8080
+```
+
+**Production checklist:**
+- **Add the site's origin to the backend's `CORS_ORIGIN`, even though the app is same-origin.** Browsers send `Origin` on POST requests and the backend checks it. The compose file sets this from `PUBLIC_URL`.
+- Set the backend's `APP_URL` to the public origin, so product image URLs point at it.
+- Terminate TLS in front of the web container. Keep the API unreachable except through it.
 
 ## Tests
 
-- **Unit and component (60 tests):** API client, error mapping, auth service (single-flight refresh, token placement, session restore), auth and error interceptors, guards, cart store, validators, product query parsing, upload checks, idempotency key lifecycle, plus component tests for login, cart and checkout.
-- **E2E (8 tests, Playwright and Chromium, against the real API):**
-  - register → filter → product → add 2 to cart → checkout with `WELCOME10` → the confirmation shows the server's discount and total → order history;
-  - a returning customer sees their paid order;
-  - wrong credentials show a generic error;
-  - an admin creates a product with an image and it appears in the shop;
-  - the client rejects SVG uploads;
-  - a normal user is blocked from `/admin`;
-  - anonymous visitors are redirected to sign in and back;
-  - unknown URLs show a 404 page.
+- **Unit and component (90 tests):**
+  - API client, error mapping, auth service, interceptors and guards;
+  - cart store, validators, query parsing, upload checks and the idempotency key lifecycle;
+  - search box: debounce, minimum length, stale-request cancellation, category scope, failure handling, in-app submit;
+  - product card: badges, events that don't navigate, saved state, image fallback;
+  - app shell: cart label and role-aware navigation;
+  - product list: filter chips, removal, skeleton and empty states, price-range validation;
+  - recently viewed store, and SEO metadata;
+  - component tests for login, cart (including move-to-wishlist) and checkout.
+- **E2E (18 tests, Playwright and Chromium, against the real API):**
+  - the customer journey from registration to order history;
+  - admin product creation, SVG rejection and access control;
+  - home rails and categories;
+  - header suggestions and search;
+  - removable filter chips;
+  - Buy now and related products;
+  - robots and canonical tags;
+  - on a 390 px phone: no horizontal overflow on three pages, the drawer and cart, and the filter panel.
 
   `npm run e2e:prod` runs the same suite against the production build.
 
 ## Security notes
 
-- **Tokens.** The backend returns tokens in JSON (no HttpOnly cookies). The access token is kept in memory only. The refresh token is kept in `sessionStorage`, scoped to the tab, so a page reload stays signed in. Refresh is single-flight, because the backend rotates refresh tokens and parallel 401s would otherwise race and log the user out. No CSRF handling is needed, since no cookies are used.
+- **Tokens.** The backend returns tokens in JSON (no HttpOnly cookies). The access token is kept in memory only. The refresh token lives in `sessionStorage`, scoped to the tab. Refresh is single-flight, because the backend rotates refresh tokens. No CSRF handling is needed, since no cookies are used.
 - **Roles.** The UI reads the role from `GET /users` and only *hides* features. Every protected endpoint is authorized by the backend.
-- **Prices.** Only product ids, quantities, the address and the coupon code are sent. Totals, discounts and payment state are displayed from server responses. The cart page shows a clearly labelled *estimate*, because the cart API returns no totals.
-- **Sanitization.** The app uses Angular's built-in sanitization only: no `innerHTML`, `bypassSecurityTrust*`, `localStorage` or `eval`. The post-login `returnUrl` only accepts in-app paths (open-redirect guard).
+- **Prices.** Only product ids, quantities, the address and the coupon code are sent. Totals, discounts and payment state are displayed from server responses. The cart page shows a clearly labelled *estimate*.
+- **Sanitization.** The app uses Angular's built-in escaping only: no `innerHTML`, `bypassSecurityTrust*`, `localStorage` or `eval`. The post-login `returnUrl` only accepts in-app paths.
 - **Uploads.** Files are checked client-side (JPG/PNG/WebP, 5 MB or less) as UX only. The backend re-validates type, magic bytes and size.
-
-## What was built and what was reused
-
-The previous untracked Angular 21 project was committed first as a baseline. I then upgraded it with `ng update` to Angular 22, which also fixed six npm-audit advisories (XSS and cache poisoning) in 21.2.13.
-
-- **Reused:** the project scaffold, tsconfig strictness, the Vitest builder, the angular-eslint setup, the envelope-unwrapping `ApiClientService` (extended), and the endpoint map (re-typed into per-resource services).
-- **Replaced:**
-  - Auth: tokens were in `sessionStorage` and refresh could race.
-  - Interceptor: there was no error or loading handling.
-  - Cart and checkout: they computed subtotals client-side, showed an invented "10% discount" and offered a Razorpay option the backend doesn't support.
-  - Product cards: they showed fabricated "% off" and list prices.
-  - All pages: rewritten with Material, OnPush, and loading/empty/error states.
-- **Removed (with approval):** the legacy services (one called `inject()` at runtime and crashed), the notifications page (the backend has no endpoint for it), and the old CSS and the Lucide icon library.
 
 ## Backend gaps (not worked around, flagged)
 
-1. No forgot/reset password, password change or profile update endpoints. The profile page is read-only.
+1. No forgot/reset password, password change, profile update or address book endpoints. The profile page is read-only, and checkout asks for the address each time.
 2. No HttpOnly cookie auth, so the refresh token sits in `sessionStorage`.
 3. No guest cart, so guests are sent to sign in when they add to cart.
-4. The cart returns no totals, and there's no coupon preview or quote endpoint. The discount and total are only known after the order is placed.
+4. The cart returns no totals, and there's no coupon preview or quote endpoint. The discount and total are known only after the order is placed.
 5. No categories endpoint, so categories are configured in `core/config/catalog.ts`.
-6. Payment has no payment-intent or redirect endpoint. Orders are created unpaid and confirmed only by the provider webhook. No payment SDK was added.
-7. No admin endpoint to set order status arbitrarily or to approve refunds. Admins can ship, cancel and request refunds only.
-8. No user management. `GET /products` can't list inactive products or filter by seller, so deactivated products don't appear in admin lists.
-9. Single image per product, and variant selection isn't supported at checkout.
-10. `X-Device-Id` isn't in the backend's CORS allowed headers (irrelevant when same-origin).
-11. **`X-Forwarded-For` is only trusted when the backend sets `TRUST_PROXY`** (off by default since SEC-01). The E2E harness sets `TRUST_PROXY=loopback`, because the specs use `X-Forwarded-For` to give each test its own rate-limit budget. In production, set it to your reverse proxy.
-12. Unpaid orders are auto-cancelled after the reservation window, with no "pay now" flow the frontend could offer.
+6. No merchandising data: no best-seller or trending ranking, list prices, discounts, deals or banners. The home page shows only real catalogue queries, and there are no "Best sellers", "Trending" or "Deals" rows.
+7. `GET /products` cannot filter by rating or availability, or sort by rating. Those filters are deliberately absent rather than faked on one page of results.
+8. No delivery-estimate or location endpoint, so there's no "deliver to" selector or delivery dates. Shipping is confirmed at checkout.
+9. Payment has no payment-intent or redirect endpoint. Orders are created unpaid and confirmed only by the provider webhook. No payment SDK was added.
+10. No admin endpoint to approve or reject refunds or to set order status arbitrarily. No user management.
+11. Single image per product, and variant selection isn't supported at checkout.
+12. `X-Forwarded-For` is only trusted when the backend sets `TRUST_PROXY` (off by default). The E2E harness sets `TRUST_PROXY=loopback`, because the specs use `X-Forwarded-For` to give each test its own rate-limit budget. In production, set it to your reverse proxy (`1` behind the bundled nginx).
 
 ## Remaining TODOs
 
-- Self-host Roboto and Material Symbols instead of loading them from Google Fonts (privacy, and a tighter CSP).
-- The initial bundle is 754 kB raw / 171 kB transferred (warning budget raised to 800 kB). The Material shell could be trimmed further.
-- No i18n, and no dark theme toggle (the M3 theme supports one).
+- Self-host Inter, Sora and Material Symbols instead of loading them from Google Fonts (privacy, a tighter CSP, and no flash of icon ligature text while the font loads).
+- Initial bundle: 800.9 kB raw / 180.9 kB transferred (warning budget 850 kB). The Material autocomplete in the header accounts for most of the growth over the previous 754 kB / 171 kB.
+- No i18n, and no dark theme toggle (the tokens are ready for one).
 - The E2E suite runs Chromium only. Add Firefox and WebKit if needed.
+- The nginx template and both Docker images have not been run here (Docker isn't installed on this machine).

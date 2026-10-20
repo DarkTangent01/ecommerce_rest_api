@@ -11,6 +11,14 @@ export class ProductsApi {
     return this.api.getPage<Product, ProductPageMeta>('/products', query as Query);
   }
 
+  /** Search-as-you-type: a small page of the same search, without the progress bar or error toasts. */
+  suggest(q: string, category?: string, limit = 6) {
+    return this.api.getPage<Product, ProductPageMeta>('/products', { q, category: category || undefined, limit } as Query, {
+      skipLoading: true,
+      skipErrorToast: true,
+    });
+  }
+
   get(id: Id) {
     return this.api.get<Product>(`/products/${encodeURIComponent(id)}`);
   }

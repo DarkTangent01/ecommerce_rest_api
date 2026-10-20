@@ -1,52 +1,80 @@
-<div class="page">
-  <section class="hero" aria-labelledby="hero-title">
-    <div>
-      <p class="eyebrow">Welcome</p>
-      <h1 id="hero-title">Everyday things, made well.</h1>
-      <p class="muted">Browse the catalogue, save favourites and check out securely. Prices, stock and totals come straight from our servers.</p>
-      <div class="actions">
-        <a mat-flat-button routerLink="/products">Shop all products</a>
-        <a mat-stroked-button routerLink="/products" [queryParams]="{ sortBy: 'createdAt', order: 'desc' }">See what's new</a>
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="hero-eyebrow">New on AeroScript</p>
+      <h1 id="hero-title">Everything you need, <span>one search away.</span></h1>
+      <p class="hero-text">
+        Explore kitchen, home, apparel, electronics and outdoor gear. Save favourites, check out securely and follow every order from
+        your account.
+      </p>
+      <div class="hero-actions">
+        <a mat-flat-button class="as-buy" routerLink="/products">Start shopping</a>
+        <a mat-stroked-button class="hero-secondary" routerLink="/products" [queryParams]="{ sortBy: 'createdAt', order: 'desc' }">
+          See new arrivals
+        </a>
       </div>
     </div>
-  </section>
+    <div class="hero-art" aria-hidden="true">
+      @for (product of heroImages(); track product._id; let i = $index) {
+        <img [class]="'tile tile-' + i" [src]="product.image" alt="" width="320" height="320" [attr.fetchpriority]="i === 0 ? 'high' : null" />
+      } @empty {
+        <span class="tile tile-0 placeholder"></span>
+        <span class="tile tile-1 placeholder"></span>
+        <span class="tile tile-2 placeholder"></span>
+      }
+    </div>
+  </div>
+</section>
 
+<div class="page home">
   <section class="categories" aria-labelledby="categories-title">
     <h2 id="categories-title">Shop by category</h2>
     <ul>
       @for (category of categories; track category.value) {
         <li>
           <a class="category" routerLink="/products" [queryParams]="{ category: category.value }">
-            <mat-icon aria-hidden="true">{{ category.icon }}</mat-icon>
-            <span>{{ category.label }}</span>
+            <span class="category-icon"><mat-icon aria-hidden="true">{{ category.icon }}</mat-icon></span>
+            <span class="category-label">{{ category.label }}</span>
           </a>
         </li>
       }
     </ul>
   </section>
 
-  @for (shelf of shelves; track shelf.title) {
-    <section class="shelf" [attr.aria-labelledby]="'shelf-' + $index">
-      <div class="shelf-header">
-        <h2 [id]="'shelf-' + $index">{{ shelf.title }}</h2>
-        <a mat-button routerLink="/products" [queryParams]="shelf.link">View all</a>
-      </div>
-      <app-async-state [state]="shelf.state()" [errorMessage]="shelf.error()" (retry)="load(shelf)">
-        @if (shelf.products().length) {
-          <div class="product-grid">
-            @for (product of shelf.products(); track product._id) {
-              <app-product-card
-                [product]="product"
-                [saved]="wishlist.has(product._id)"
-                (addToCart)="addToCart($event)"
-                (toggleWishlist)="toggleWishlist($event)"
-              />
-            }
-          </div>
-        } @else {
-          <app-empty-state icon="storefront" title="Nothing to show yet" description="New products will appear here as soon as they are added." />
-        }
-      </app-async-state>
-    </section>
-  }
+  <ul class="promises" aria-label="Why shop with AeroScript">
+    <li>
+      <mat-icon aria-hidden="true">verified_user</mat-icon>
+      <span><strong>Secure checkout</strong>Orders are marked paid only once our payment provider confirms them.</span>
+    </li>
+    <li>
+      <mat-icon aria-hidden="true">local_shipping</mat-icon>
+      <span><strong>Track every order</strong>Follow fulfilment from confirmation to delivery in your account.</span>
+    </li>
+    <li>
+      <mat-icon aria-hidden="true">undo</mat-icon>
+      <span><strong>Refunds on delivered orders</strong>Request a refund from the order page if something isn't right.</span>
+    </li>
+  </ul>
+
+  <div class="rails">
+    @for (rail of rails; track rail.title) {
+      <app-product-rail
+        [title]="rail.title"
+        [products]="rail.products()"
+        [state]="rail.state()"
+        [seeAllQuery]="rail.seeAll"
+        (retry)="load(rail)"
+        (addToCart)="addToCart($event)"
+        (toggleWishlist)="toggleWishlist($event)"
+      />
+    }
+
+    <app-product-rail
+      title="Recently viewed"
+      [products]="recent.value() ?? []"
+      [state]="recentState() === 'error' ? 'ready' : recentState()"
+      (addToCart)="addToCart($event)"
+      (toggleWishlist)="toggleWishlist($event)"
+    />
+  </div>
 </div>

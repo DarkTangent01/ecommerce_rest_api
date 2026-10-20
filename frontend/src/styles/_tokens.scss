@@ -1,0 +1,125 @@
+// AeroScript design tokens. Everything visual reads from these custom properties; the Material
+// theme in styles.scss is mapped onto them, so Material components and our own share one palette.
+
+// Breakpoints (SCSS only: media queries cannot read custom properties).
+$bp-sm: 600px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+$bp-xl: 1280px;
+
+@mixin up($bp) {
+  @media (min-width: $bp) {
+    @content;
+  }
+}
+
+@mixin down($bp) {
+  @media (max-width: ($bp - 0.02px)) {
+    @content;
+  }
+}
+
+:root {
+  // Brand
+  --as-ink-900: #0b1220; // header, hero
+  --as-ink-800: #131d31; // category bar
+  --as-ink-700: #1f2b44;
+  --as-brand-700: #1a3fa8;
+  --as-brand-600: #2453d6; // primary actions, links
+  --as-brand-500: #3d6af0;
+  --as-brand-100: #dce6ff;
+  --as-brand-50: #eef3ff;
+  --as-flare-500: #ff9a2e; // "buy" actions; dark text on it (contrast 9:1)
+  --as-flare-600: #f08313;
+  --as-flare-100: #fff1e0;
+  --as-on-flare: #1d1205;
+
+  // Neutrals
+  --as-gray-950: #0f141c;
+  --as-gray-800: #2a313d;
+  --as-gray-600: #535c6b; // secondary text (contrast 6.6:1 on white)
+  --as-gray-400: #8a93a3;
+  --as-gray-200: #dde2ea;
+  --as-gray-100: #edf0f5;
+  --as-gray-50: #f6f8fb;
+  --as-white: #ffffff;
+
+  // Semantic
+  --as-success-700: #0d7a52;
+  --as-success-50: #e6f6ef;
+  --as-warning-700: #9a4b00;
+  --as-warning-50: #fff4e5;
+  --as-danger-700: #b42318;
+  --as-danger-50: #fdecea;
+  --as-info-700: var(--as-brand-700);
+  --as-info-50: var(--as-brand-50);
+
+  // Surfaces and text
+  --as-bg: var(--as-gray-50);
+  --as-surface: var(--as-white);
+  --as-surface-raised: var(--as-white);
+  --as-border: var(--as-gray-200);
+  --as-border-strong: #c6cdd8;
+  --as-text: var(--as-gray-950);
+  --as-text-muted: var(--as-gray-600);
+  --as-text-inverse: #f3f6fb;
+  --as-text-inverse-muted: #b5c0d3;
+  --as-link: var(--as-brand-600);
+  --as-focus: var(--as-brand-500);
+
+  // Typography
+  --as-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --as-font-display: 'Sora', var(--as-font-sans);
+  --as-text-xs: 0.75rem; // 12
+  --as-text-sm: 0.875rem; // 14
+  --as-text-md: 1rem; // 16
+  --as-text-lg: 1.125rem; // 18
+  --as-text-xl: 1.375rem; // 22
+  --as-text-2xl: 1.75rem; // 28
+  --as-text-3xl: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+  --as-leading-tight: 1.2;
+  --as-leading-normal: 1.5;
+  --as-weight-regular: 400;
+  --as-weight-medium: 500;
+  --as-weight-semibold: 600;
+  --as-weight-bold: 700;
+
+  // Spacing (4px scale)
+  --as-space-1: 4px;
+  --as-space-2: 8px;
+  --as-space-3: 12px;
+  --as-space-4: 16px;
+  --as-space-5: 20px;
+  --as-space-6: 24px;
+  --as-space-8: 32px;
+  --as-space-10: 40px;
+  --as-space-12: 48px;
+  --as-space-16: 64px;
+  --as-gutter: 16px;
+  --as-container: 1280px;
+
+  // Shape
+  --as-radius-sm: 6px;
+  --as-radius-md: 10px;
+  --as-radius-lg: 14px;
+  --as-radius-pill: 999px;
+  --as-border-width: 1px;
+
+  // Elevation
+  --as-shadow-1: 0 1px 2px rgb(15 20 28 / 0.06), 0 1px 1px rgb(15 20 28 / 0.04);
+  --as-shadow-2: 0 4px 12px rgb(15 20 28 / 0.08), 0 1px 3px rgb(15 20 28 / 0.06);
+  --as-shadow-3: 0 12px 32px rgb(15 20 28 / 0.14);
+
+  // Motion
+  --as-ease: cubic-bezier(0.2, 0, 0, 1);
+  --as-duration-fast: 120ms;
+  --as-duration: 200ms;
+
+  // Layers
+  --as-z-header: 100;
+  --as-z-overlay: 1000;
+
+  @include up($bp-md) {
+    --as-gutter: 24px;
+  }
+}

@@ -16,9 +16,14 @@ export type ViewState = 'loading' | 'error' | 'ready';
   template: `
     @switch (state()) {
       @case ('loading') {
-        <div class="state" role="status" aria-live="polite">
-          <mat-progress-spinner mode="indeterminate" diameter="40" aria-label="Loading" />
+        <div role="status" aria-live="polite">
           <span class="visually-hidden">{{ loadingLabel() }}</span>
+          <!-- Pages may project a skeleton with the asLoading attribute; otherwise a spinner. -->
+          <ng-content select="[asLoading]">
+            <div class="state">
+              <mat-progress-spinner mode="indeterminate" diameter="40" aria-label="Loading" />
+            </div>
+          </ng-content>
         </div>
       }
       @case ('error') {
