@@ -14,7 +14,8 @@
     "format": "prettier --write \"src/**/*.{ts,html,scss,json}\" \"e2e/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\" \"e2e/**/*.ts\"",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "e2e:prod": "ng build && node -e \"process.env.E2E_BASE_URL='http://localhost:4300';require('child_process').execSync('npx playwright test',{stdio:'inherit'})\""
   },
   "engines": {
     "node": ">=20.19"

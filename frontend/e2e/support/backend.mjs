@@ -128,7 +128,7 @@ const server = spawn(process.execPath, [path.join(backendRoot, 'node_modules/tsx
     APP_URL: `http://127.0.0.1:${PORT}`,
     DB_URL: dbUrl,
     DEBUG_MODE: 'false',
-    CORS_ORIGIN: 'http://localhost:4200,http://127.0.0.1:4200',
+    CORS_ORIGIN: 'http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300',
     BCRYPT_ROUNDS: '4',
     ...secrets,
   },

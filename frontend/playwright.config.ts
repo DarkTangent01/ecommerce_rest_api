@@ -15,7 +15,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:4200',
+    // E2E_BASE_URL runs the suite against another server, e.g. the production build (see README).
+    baseURL: process.env['E2E_BASE_URL'] ?? 'http://localhost:4200',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -29,8 +30,8 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
-      command: 'npx ng serve --port 4200',
-      url: 'http://localhost:4200',
+      command: process.env['E2E_BASE_URL'] ? 'node e2e/support/serve-dist.mjs' : 'npx ng serve --port 4200',
+      url: process.env['E2E_BASE_URL'] ?? 'http://localhost:4200',
       timeout: 180_000,
       reuseExistingServer: !process.env['CI'],
     },
