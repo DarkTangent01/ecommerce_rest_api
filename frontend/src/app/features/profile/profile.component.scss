@@ -1,0 +1,45 @@
+.grid {
+  display: grid;
+  gap: 16px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+dl {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+
+  div {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+  }
+}
+
+dt {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+dd {
+  margin: 0;
+}
+
+.role {
+  text-transform: capitalize;
+}
+
+.links {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+}
+
+.small {
+  font: var(--mat-sys-body-small);
+}
+
+.danger {
+  color: var(--mat-sys-error);
+}

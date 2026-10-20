@@ -1,0 +1,74 @@
+<div class="page">
+  <a mat-button routerLink="/account/orders"><mat-icon>arrow_back</mat-icon> All orders</a>
+  <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading order" (retry)="order.reload()">
+    @if (order.value(); as item) {
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Order …{{ item._id.slice(-8) }}</p>
+          <h1>Placed {{ item.createdAt | date: 'mediumDate' }}</h1>
+          <div class="chips">
+            <app-status-chip [status]="item.status" />
+            <app-status-chip [status]="item.paymentStatus" />
+          </div>
+        </div>
+        <div class="actions">
+          @if (canCancel(item)) {
+            <button mat-stroked-button type="button" (click)="cancel(item)">Cancel order</button>
+          }
+          @if (canRequestRefund(item)) {
+            <button mat-stroked-button type="button" (click)="requestRefund(item)">Request refund</button>
+          }
+        </div>
+      </header>
+
+      @if (item.status === 'cancelled' && item.cancellationReason) {
+        <p class="notice" role="status">Cancelled: {{ item.cancellationReason }}</p>
+      }
+      @if (item.status === 'refund_requested') {
+        <p class="notice" role="status">Refund requested. We will update you once it has been reviewed.</p>
+      }
+
+      <div class="layout">
+        <section class="surface" aria-labelledby="items-title">
+          <h2 id="items-title">Items</h2>
+          <table class="items">
+            <thead>
+              <tr><th scope="col">Product</th><th scope="col">Qty</th><th scope="col">Price</th></tr>
+            </thead>
+            <tbody>
+              @for (line of item.items; track line.product) {
+                <tr>
+                  <td><a [routerLink]="['/products', line.product]">{{ line.name }}</a></td>
+                  <td>{{ line.quantity }}</td>
+                  <td>{{ line.price | money }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <dl class="totals">
+            <div class="summary-row"><dt>Subtotal</dt><dd>{{ item.subtotal ?? item.total | money }}</dd></div>
+            @if (item.discountTotal > 0) {
+              <div class="summary-row"><dt>Discount</dt><dd>−{{ item.discountTotal | money }}</dd></div>
+            }
+            <div class="summary-row total"><dt>Total</dt><dd>{{ item.total | money }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="surface" aria-labelledby="ship-title">
+          <h2 id="ship-title">Shipping to</h2>
+          <address>
+            {{ item.shippingAddress.line1 }}<br />
+            @if (item.shippingAddress.line2) {
+              {{ item.shippingAddress.line2 }}<br />
+            }
+            {{ item.shippingAddress.city }}, {{ item.shippingAddress.state }} {{ item.shippingAddress.postalCode }}<br />
+            {{ item.shippingAddress.country }}
+          </address>
+          @if (item.paymentStatus === 'unpaid' && item.status === 'pending') {
+            <p class="muted small">Awaiting payment confirmation from our payment provider.</p>
+          }
+        </section>
+      </div>
+    }
+  </app-async-state>
+</div>

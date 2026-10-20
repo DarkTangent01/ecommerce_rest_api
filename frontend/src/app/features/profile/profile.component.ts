@@ -1,49 +1,79 @@
-import { JsonPipe } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ProfileApiService } from '../../core/api/domain-api.services';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
+import { filter, switchMap } from 'rxjs';
+import { AccountApi } from '../../core/api/account.api';
 import { AuthService } from '../../core/auth/auth.service';
+import { ApiError } from '../../core/http/api-error';
+import { ConfirmDialogComponent, type ConfirmDialogData } from '../../shared/components/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast.service';
 
 @Component({
   selector: 'app-profile',
-  imports: [JsonPipe],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="page-header">
-      <p class="eyebrow">Account</p>
-      <h1>{{ auth.user()?.name || 'Profile' }}</h1>
-      <p>{{ auth.user()?.email }} · {{ auth.user()?.role }}</p>
-    </section>
-    <section class="dashboard-grid">
-      <article class="stat-card">
-        <span>Tenant</span>
-        <strong>{{ auth.user()?.tenant || 'default' }}</strong>
-      </article>
-      <article class="stat-card">
-        <span>MFA</span>
-        <strong>{{ auth.user()?.mfaEnabled ? 'Enabled' : 'Not enabled' }}</strong>
-      </article>
-    </section>
-    <section class="section">
-      <button class="button ghost" type="button" (click)="export()">Export my data</button>
-      @if (exportData()) {
-        <pre class="json-panel">{{ exportData() | json }}</pre>
-      }
-    </section>
-  `,
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './profile.component.html',
+  styleUrl: './profile.component.scss',
 })
 export class ProfileComponent {
   readonly auth = inject(AuthService);
-  private readonly profile = inject(ProfileApiService);
+  private readonly api = inject(AccountApi);
+  private readonly dialog = inject(MatDialog);
   private readonly toast = inject(ToastService);
-  readonly exportData = signal<unknown | null>(null);
+  readonly exporting = signal(false);
+
   constructor() {
-    this.auth.loadProfile().subscribe();
+    // Refresh the profile so role/name changes made by an admin show up.
+    this.auth.loadProfile().subscribe({ error: () => undefined });
   }
-  export(): void {
-    this.profile.exportData().subscribe({
-      next: (data) => this.exportData.set(data),
-      error: (err) => this.toast.show(err.error?.message ?? 'Export failed', 'error'),
+
+  exportData(): void {
+    this.exporting.set(true);
+    this.api.exportData().subscribe({
+      next: (data) => {
+        this.exporting.set(false);
+        // Serialized and saved through a Blob URL: nothing is injected into the page.
+        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'my-account-data.json';
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.exporting.set(false),
     });
+  }
+
+  deleteAccount(): void {
+    this.dialog
+      .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
+        data: {
+          title: 'Delete your account?',
+          message: 'Your account will be deactivated and your personal details anonymised. This cannot be undone.',
+          confirmLabel: 'Delete account',
+          destructive: true,
+        },
+      })
+      .afterClosed()
+      .pipe(
+        filter((confirmed) => confirmed === true),
+        switchMap(() => this.api.deleteAccount()),
+      )
+      .subscribe({
+        next: () => {
+          this.toast.show('Your account has been deleted.', 'success');
+          this.auth.logout('/');
+        },
+        error: (error: unknown) => {
+          const apiError = ApiError.from(error);
+          this.toast.show(
+            apiError.status === 403 ? 'For your security, sign out and sign in again before deleting your account.' : apiError.message,
+            'error',
+          );
+        },
+      });
   }
 }

@@ -1,0 +1,52 @@
+.chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 2fr 1fr;
+    align-items: start;
+  }
+}
+
+.items {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+
+  th,
+  td {
+    text-align: left;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  th:not(:first-child),
+  td:not(:first-child) {
+    text-align: right;
+  }
+}
+
+dd {
+  margin: 0;
+}
+
+address {
+  font-style: normal;
+  margin-top: 8px;
+}
+
+.notice {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-secondary-container);
+}
+
+.small {
+  font: var(--mat-sys-body-small);
+}
