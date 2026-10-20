@@ -57,3 +57,4 @@ Thumbs.db
 
 # Seed output of e2e/support/backend.mjs (throwaway local test accounts)
 /e2e/.seed.json
+/e2e/.uploads-baseline.json

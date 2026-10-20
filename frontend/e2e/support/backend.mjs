@@ -135,11 +135,24 @@ const server = spawn(process.execPath, [path.join(backendRoot, 'node_modules/tsx
   stdio: ['ignore', 'ignore', 'inherit'],
 });
 
+// Images the seed (and tests, through the API) upload land in the backend's uploads/ folder;
+// remove the ones this run created so the backend repo stays clean.
+const uploadsDir = path.join(backendRoot, 'uploads');
+const uploadsBefore = new Set(fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : []);
+// Also recorded on disk: when Playwright stops this process on Windows no signal handler runs,
+// so e2e/support/teardown.ts removes the files instead.
+fs.writeFileSync(path.join(frontendRoot, 'e2e', '.uploads-baseline.json'), JSON.stringify([...uploadsBefore]));
+const removeNewUploads = () => {
+  if (!fs.existsSync(uploadsDir)) return;
+  for (const file of fs.readdirSync(uploadsDir)) if (!uploadsBefore.has(file)) fs.rmSync(path.join(uploadsDir, file), { force: true });
+};
+
 let shuttingDown = false;
 const shutdown = async (code = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
   server.kill();
+  removeNewUploads();
   await mongo.stop().catch(() => undefined);
   process.exit(code);
 };
