@@ -3,3 +3,5 @@
 .vscode/
 .vs/
 logs/
+dist/
+coverage/

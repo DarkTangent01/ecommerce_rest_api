@@ -1,0 +1,42 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Account</p>
+      <h1>Order history</h1>
+    </div>
+  </header>
+
+  <app-async-state [state]="state()" [errorMessage]="error()" loadingLabel="Loading orders" (retry)="orders.reload()">
+    @if (orders.value()?.items?.length) {
+      <ul class="orders">
+        @for (order of orders.value()!.items; track order._id) {
+          <li>
+            <a class="order surface" [routerLink]="['/account/orders', order._id]">
+              <div class="main">
+                <strong>Order …{{ order._id.slice(-8) }}</strong>
+                <span class="muted">{{ order.createdAt | date: 'mediumDate' }} · {{ order.items.length }} {{ order.items.length === 1 ? 'item' : 'items' }}</span>
+              </div>
+              <div class="chips">
+                <app-status-chip [status]="order.status" />
+                <app-status-chip [status]="order.paymentStatus" />
+              </div>
+              <strong class="total">{{ order.total | money }}</strong>
+            </a>
+          </li>
+        }
+      </ul>
+      <mat-paginator
+        [length]="orders.value()!.meta.total"
+        [pageIndex]="page() - 1"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        (page)="changePage($event)"
+        aria-label="Choose orders page"
+      />
+    } @else {
+      <app-empty-state icon="receipt_long" title="No orders yet" description="When you place an order it will show up here.">
+        <a mat-flat-button routerLink="/products">Start shopping</a>
+      </app-empty-state>
+    }
+  </app-async-state>
+</div>

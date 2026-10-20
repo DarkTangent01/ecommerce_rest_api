@@ -4,16 +4,28 @@ on:
   push:
   pull_request:
 
+# Least privilege: the job only needs to read the repository.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Pinned to full commit SHAs (SEC-14); Dependabot (.github/dependabot.yml) proposes updates.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: yarn
       - run: yarn install --frozen-lockfile
-      - run: yarn validate
+      - run: yarn typecheck
+      - run: yarn lint
       - run: yarn test
-      - run: yarn audit
+      - run: yarn build
+      # Fails on moderate or worse advisories in production dependencies (DEP-01).
+      - run: yarn audit --groups dependencies --level moderate
+      # Full report including dev tooling, for visibility; does not block the build.
+      - run: yarn audit || true

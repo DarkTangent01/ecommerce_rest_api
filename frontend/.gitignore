@@ -1,0 +1,60 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.history/*
+
+# Environment files that may hold machine-specific or secret values.
+# src/environments/*.ts are committed and must never contain secrets.
+.env
+.env.*
+!.env.example
+
+# Test output
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# Miscellaneous
+/.angular
+.sass-cache/
+/connect.lock
+/coverage
+/libpeerconnection.log
+testem.log
+/typings
+__screenshots__/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Seed output of e2e/support/backend.mjs (throwaway local test accounts)
+/e2e/.seed.json
+/e2e/.uploads-baseline.json

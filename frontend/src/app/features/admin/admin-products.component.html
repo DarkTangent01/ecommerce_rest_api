@@ -1,0 +1,80 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">{{ auth.hasRole('admin') ? 'Admin' : 'Seller' }}</p>
+      <h1>Products</h1>
+    </div>
+    @if (!editing()) {
+      <button mat-flat-button type="button" (click)="editing.set('new')"><mat-icon>add</mat-icon> New product</button>
+    }
+  </header>
+
+  @if (editing()) {
+    <section class="surface editor" aria-labelledby="editor-title">
+      <h2 id="editor-title">{{ editingProduct() ? 'Edit “' + editingProduct()!.name + '”' : 'New product' }}</h2>
+      <app-product-form [product]="editingProduct()" (saved)="saved($event)" (cancelled)="editing.set(null)" />
+    </section>
+  }
+
+  <form class="toolbar" (ngSubmit)="applySearch()" role="search">
+    <mat-form-field>
+      <mat-label>Search products</mat-label>
+      <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+      <input matInput [formControl]="search" type="search" maxlength="100" />
+    </mat-form-field>
+    <button mat-stroked-button type="submit">Search</button>
+  </form>
+
+  <app-async-state [state]="state()" [errorMessage]="error()" (retry)="products.reload()">
+    @if (products.value()?.items?.length) {
+      <div class="table-wrap">
+        <table class="table">
+          <caption class="visually-hidden">Products</caption>
+          <thead>
+            <tr>
+              <th scope="col"><span class="visually-hidden">Image</span></th>
+              <th scope="col">Name</th>
+              <th scope="col">Category</th>
+              <th scope="col" class="num">Price</th>
+              <th scope="col" class="num">Stock</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (product of products.value()!.items; track product._id) {
+              <tr>
+                <td><img [src]="product.image" alt="" width="40" height="40" loading="lazy" /></td>
+                <td><a [routerLink]="['/products', product._id]">{{ product.name }}</a></td>
+                <td>{{ product.category ?? '—' }}</td>
+                <td class="num">{{ product.price | money }}</td>
+                <td class="num">{{ product.stock }}</td>
+                <td class="num">
+                  @if (canEdit(product)) {
+                    <button mat-icon-button type="button" (click)="editing.set(product)" [attr.aria-label]="'Edit ' + product.name">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                  }
+                  @if (auth.hasRole('admin')) {
+                    <button mat-icon-button type="button" (click)="remove(product)" [attr.aria-label]="'Remove ' + product.name">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [length]="products.value()!.meta.total"
+        [pageIndex]="page() - 1"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        (page)="changePage($event)"
+        aria-label="Choose products page"
+      />
+    } @else {
+      <app-empty-state icon="inventory_2" title="No products found" />
+    }
+  </app-async-state>
+</div>

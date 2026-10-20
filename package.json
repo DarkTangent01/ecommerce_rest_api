@@ -3,18 +3,29 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tests/tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "validate": "node scripts/check-syntax.js",
-    "test": "node tests/security/security.test.js && node tests/unit/oop.test.js && node tests/integration/runtime.test.js",
-    "test:e2e:mongo": "node tests/e2e/mongo.test.js",
+    "migrate:reservations-ttl": "tsx scripts/migrations/001-drop-reservation-ttl.ts",
+    "migrate:domain-event-index": "tsx scripts/migrations/002-domain-event-key-index.ts",
+    "migrate:shipment-per-seller": "tsx scripts/migrations/003-shipment-per-seller-index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "audit:deps": "yarn audit",
     "scan:security": "yarn audit && yarn validate && yarn test",
     "load:test": "node scripts/load-test.js",
     "chaos:plan": "node scripts/chaos-check.js",
-    "workers": "node workers/index.js",
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "workers": "node dist/workers/index.js"
   },
   "keywords": [],
   "author": "MAYANK SRIVASTAVA",
@@ -23,12 +34,38 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
-    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
-    "multer": "^2.0.0"
+    "mongoose": "^8.24.5",
+    "multer": "^2.4.0",
+    "zod": "^4.6.7"
+  },
+  "resolutions": {
+    "@types/express": "^4.17.21",
+    "@types/express-serve-static-core": "^4.19.6",
+    "@types/node": "^20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "mongodb-memory-server": "^11.3.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^7",
+    "vitest": "^5.0.5"
   }
 }

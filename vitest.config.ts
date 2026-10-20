@@ -1,0 +1,15 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    include: ["tests/**/*.test.ts"],
+    environment: "node",
+    setupFiles: ["tests/setup/env.ts"],
+    // Integration suites start an in-memory MongoDB replica set per file.
+    hookTimeout: 120_000,
+    testTimeout: 30_000,
+    fileParallelism: false,
+    // Drop the app's structured JSON request logs; keep everything else.
+    onConsoleLog: (log) => !log.startsWith('{"at":'),
+  },
+});

@@ -1,0 +1,42 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Account</p>
+      <h1>{{ auth.user()?.name }}</h1>
+    </div>
+  </header>
+
+  @if (auth.user(); as user) {
+    <div class="grid">
+      <section class="surface" aria-labelledby="details-title">
+        <h2 id="details-title">Your details</h2>
+        <dl>
+          <div><dt>Name</dt><dd>{{ user.name }}</dd></div>
+          <div><dt>Email</dt><dd>{{ user.email }}</dd></div>
+          <div><dt>Member since</dt><dd>{{ user.createdAt | date: 'longDate' }}</dd></div>
+          @if (user.role !== 'user') {
+            <div><dt>Role</dt><dd class="role">{{ user.role }}</dd></div>
+          }
+        </dl>
+        <p class="muted small">Changing your name, email or password is not available online yet. Contact support to update them.</p>
+      </section>
+
+      <nav class="surface links" aria-label="Account sections">
+        <a mat-button routerLink="/account/orders"><mat-icon>receipt_long</mat-icon> Order history</a>
+        <a mat-button routerLink="/account/wishlist"><mat-icon>favorite</mat-icon> Wishlist</a>
+        <a mat-button routerLink="/cart"><mat-icon>shopping_cart</mat-icon> Cart</a>
+      </nav>
+
+      <section class="surface" aria-labelledby="privacy-title">
+        <h2 id="privacy-title">Your data</h2>
+        <p class="muted">Download a copy of everything we store about you, or delete your account.</p>
+        <div class="actions">
+          <button mat-stroked-button type="button" [disabled]="exporting()" (click)="exportData()">
+            <mat-icon>download</mat-icon> {{ exporting() ? 'Preparing…' : 'Download my data' }}
+          </button>
+          <button mat-button type="button" class="danger" (click)="deleteAccount()"><mat-icon>delete_forever</mat-icon> Delete account</button>
+        </div>
+      </section>
+    </div>
+  }
+</div>

@@ -1,0 +1,122 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Coupons</h1>
+    </div>
+    @if (!editing()) {
+      <button mat-flat-button type="button" (click)="open('new')"><mat-icon>add</mat-icon> New coupon</button>
+    }
+  </header>
+
+  @if (editing(); as current) {
+    <section class="surface editor" aria-labelledby="coupon-editor">
+      <h2 id="coupon-editor">{{ current === 'new' ? 'New coupon' : 'Edit ' + current.code }}</h2>
+      <form [formGroup]="form" (ngSubmit)="save()" class="form-grid two" novalidate>
+        <mat-form-field>
+          <mat-label>Code</mat-label>
+          <input matInput formControlName="code" [maxlength]="rules.coupon.code" required />
+          @if (form.controls.code.invalid) {
+            <mat-error>{{ errorMessage(form.controls.code, 'Code') }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Type</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="percentage">Percentage off</mat-option>
+            <mat-option value="fixed">Fixed amount off</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>{{ form.controls.type.value === 'percentage' ? 'Percent' : 'Amount' }}</mat-label>
+          <input matInput formControlName="value" type="number" min="0" step="0.01" required />
+          @if (form.controls.value.invalid) {
+            <mat-error>{{ errorMessage(form.controls.value, 'Value') }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Maximum discount (optional)</mat-label>
+          <input matInput formControlName="maxDiscount" type="number" min="0" step="0.01" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Minimum order total</mat-label>
+          <input matInput formControlName="minOrderTotal" type="number" min="0" step="0.01" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Total uses allowed</mat-label>
+          <input matInput formControlName="usageLimit" type="number" min="1" step="1" required />
+          @if (form.controls.usageLimit.invalid) {
+            <mat-error>{{ errorMessage(form.controls.usageLimit, 'Total uses') }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Uses per customer</mat-label>
+          <input matInput formControlName="perUserLimit" type="number" min="1" step="1" required />
+          @if (form.controls.perUserLimit.invalid) {
+            <mat-error>{{ errorMessage(form.controls.perUserLimit, 'Uses per customer') }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Starts (optional)</mat-label>
+          <input matInput formControlName="startsAt" type="date" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Expires (optional)</mat-label>
+          <input matInput formControlName="expiresAt" type="date" />
+        </mat-form-field>
+        <mat-checkbox formControlName="isActive">Active</mat-checkbox>
+        @if (formError(); as message) {
+          <p class="full form-error" role="alert">{{ message }}</p>
+        }
+        <div class="full actions">
+          <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save coupon' }}</button>
+          <button mat-button type="button" (click)="editing.set(null)">Cancel</button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <app-async-state [state]="state()" [errorMessage]="error()" (retry)="coupons.reload()">
+    @if (coupons.value()?.items?.length) {
+      <div class="table-wrap">
+        <table class="table">
+          <caption class="visually-hidden">Coupons</caption>
+          <thead>
+            <tr>
+              <th scope="col">Code</th>
+              <th scope="col">Discount</th>
+              <th scope="col" class="num">Used</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (coupon of coupons.value()!.items; track coupon._id) {
+              <tr>
+                <td><strong>{{ coupon.code }}</strong></td>
+                <td>{{ coupon.type === 'percentage' ? coupon.value + '%' : (coupon.value | money) }}</td>
+                <td class="num">{{ coupon.usedCount }} / {{ coupon.usageLimit }}</td>
+                <td>{{ coupon.expiresAt ? (coupon.expiresAt | date: 'mediumDate') : 'Never' }}</td>
+                <td>{{ coupon.isActive ? 'Active' : 'Inactive' }}</td>
+                <td class="num">
+                  <button mat-icon-button type="button" (click)="open(coupon)" [attr.aria-label]="'Edit coupon ' + coupon.code"><mat-icon>edit</mat-icon></button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [length]="coupons.value()!.meta.total"
+        [pageIndex]="page() - 1"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        (page)="changePage($event)"
+        aria-label="Choose coupons page"
+      />
+    } @else {
+      <app-empty-state icon="sell" title="No coupons yet" />
+    }
+  </app-async-state>
+</div>

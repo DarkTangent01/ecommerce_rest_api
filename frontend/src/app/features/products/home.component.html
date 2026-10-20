@@ -1,0 +1,52 @@
+<div class="page">
+  <section class="hero" aria-labelledby="hero-title">
+    <div>
+      <p class="eyebrow">Welcome</p>
+      <h1 id="hero-title">Everyday things, made well.</h1>
+      <p class="muted">Browse the catalogue, save favourites and check out securely. Prices, stock and totals come straight from our servers.</p>
+      <div class="actions">
+        <a mat-flat-button routerLink="/products">Shop all products</a>
+        <a mat-stroked-button routerLink="/products" [queryParams]="{ sortBy: 'createdAt', order: 'desc' }">See what's new</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="categories" aria-labelledby="categories-title">
+    <h2 id="categories-title">Shop by category</h2>
+    <ul>
+      @for (category of categories; track category.value) {
+        <li>
+          <a class="category" routerLink="/products" [queryParams]="{ category: category.value }">
+            <mat-icon aria-hidden="true">{{ category.icon }}</mat-icon>
+            <span>{{ category.label }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  </section>
+
+  @for (shelf of shelves; track shelf.title) {
+    <section class="shelf" [attr.aria-labelledby]="'shelf-' + $index">
+      <div class="shelf-header">
+        <h2 [id]="'shelf-' + $index">{{ shelf.title }}</h2>
+        <a mat-button routerLink="/products" [queryParams]="shelf.link">View all</a>
+      </div>
+      <app-async-state [state]="shelf.state()" [errorMessage]="shelf.error()" (retry)="load(shelf)">
+        @if (shelf.products().length) {
+          <div class="product-grid">
+            @for (product of shelf.products(); track product._id) {
+              <app-product-card
+                [product]="product"
+                [saved]="wishlist.has(product._id)"
+                (addToCart)="addToCart($event)"
+                (toggleWishlist)="toggleWishlist($event)"
+              />
+            }
+          </div>
+        } @else {
+          <app-empty-state icon="storefront" title="Nothing to show yet" description="New products will appear here as soon as they are added." />
+        }
+      </app-async-state>
+    </section>
+  }
+</div>

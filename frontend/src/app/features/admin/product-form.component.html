@@ -1,0 +1,84 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="form-grid two" novalidate>
+  <mat-form-field class="full">
+    <mat-label>Name</mat-label>
+    <input matInput formControlName="name" [maxlength]="rules.product.nameMax" required />
+    @if (form.controls.name.invalid) {
+      <mat-error>{{ errorMessage(form.controls.name, 'Name') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Price</mat-label>
+    <span matTextPrefix>$&nbsp;</span>
+    <input matInput formControlName="price" type="number" min="0" step="0.01" inputmode="decimal" required />
+    @if (form.controls.price.invalid) {
+      <mat-error>{{ errorMessage(form.controls.price, 'Price') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Stock</mat-label>
+    <input matInput formControlName="stock" type="number" min="0" step="1" inputmode="numeric" required />
+    @if (form.controls.stock.invalid) {
+      <mat-error>{{ errorMessage(form.controls.stock, 'Stock') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Category</mat-label>
+    <mat-select formControlName="category">
+      <mat-option value="">None</mat-option>
+      @for (category of categories; track category.value) {
+        <mat-option [value]="category.value">{{ category.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>SKU (optional)</mat-label>
+    <input matInput formControlName="sku" [maxlength]="rules.product.sku" />
+    @if (form.controls.sku.invalid) {
+      <mat-error>{{ errorMessage(form.controls.sku, 'SKU') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Size (optional)</mat-label>
+    <input matInput formControlName="size" [maxlength]="rules.product.size" />
+  </mat-form-field>
+
+  @if (isAdmin()) {
+    <mat-checkbox formControlName="isActive">Visible in the shop</mat-checkbox>
+  }
+
+  <mat-form-field class="full">
+    <mat-label>Description</mat-label>
+    <textarea matInput formControlName="description" rows="4" [maxlength]="rules.product.description"></textarea>
+    <mat-hint align="end">{{ form.controls.description.value.length }} / {{ rules.product.description }}</mat-hint>
+  </mat-form-field>
+
+  <div class="full image">
+    @if (preview()) {
+      <img class="preview" [src]="preview()" alt="Selected product image" />
+    }
+    <div>
+      <label class="mat-mdc-button-base" for="product-image">
+        <span class="muted">{{ product() ? 'Replace image (optional)' : 'Product image' }}</span>
+      </label>
+      <input id="product-image" type="file" [accept]="accept" (change)="pickImage($event)" aria-describedby="image-hint" />
+      <p id="image-hint" class="muted">JPG, PNG or WebP, up to 5 MB.</p>
+      @if (fileError(); as message) {
+        <p class="file-error" role="alert">{{ message }}</p>
+      }
+    </div>
+  </div>
+
+  @if (formError(); as message) {
+    <p class="form-error full" role="alert">{{ message }}</p>
+  }
+
+  <div class="full actions">
+    <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : product() ? 'Save changes' : 'Create product' }}</button>
+    <button mat-button type="button" (click)="cancelled.emit()">Cancel</button>
+  </div>
+</form>

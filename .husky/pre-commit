@@ -1,2 +1,2 @@
 #!/bin/sh
-yarn validate && yarn test
+yarn typecheck && yarn lint && yarn test

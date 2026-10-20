@@ -1,0 +1,103 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Shopping cart</p>
+      <h1>Your cart</h1>
+      <p>{{ cart.count() }} {{ cart.count() === 1 ? 'item' : 'items' }}</p>
+    </div>
+    <a mat-button routerLink="/products"><mat-icon>arrow_back</mat-icon> Continue shopping</a>
+  </header>
+
+  <app-async-state [state]="state()" loadingLabel="Loading your cart" (retry)="cart.load()">
+    @if (cart.isEmpty() && cart.unavailableLines().length === 0) {
+      <app-empty-state icon="shopping_cart" title="Your cart is empty" description="Find something you like and add it to your cart.">
+        <a mat-flat-button routerLink="/products">Browse products</a>
+      </app-empty-state>
+    } @else {
+      <div class="layout">
+        <section aria-label="Cart items">
+          @if (cart.unavailableLines().length) {
+            <div class="warning" role="alert">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              <div>
+                <strong>Some items are no longer available.</strong>
+                <p>Remove them to continue to checkout.</p>
+              </div>
+              <button mat-stroked-button type="button" (click)="removeUnavailable()">Remove unavailable</button>
+            </div>
+          }
+
+          <ul class="lines">
+            @for (line of cart.lines(); track line.product._id) {
+              <li class="line" [class.unavailable]="!line.product.isActive">
+                <a [routerLink]="['/products', line.product._id]" tabindex="-1" aria-hidden="true">
+                  <img [src]="line.product.image" alt="" width="96" height="96" loading="lazy" />
+                </a>
+                <div class="info">
+                  <a class="name" [routerLink]="['/products', line.product._id]">{{ line.product.name }}</a>
+                  <span class="muted">{{ line.product.price | money }} each</span>
+                  @if (line.product.isActive) {
+                    <app-stock-badge [stock]="line.product.stock" />
+                  } @else {
+                    <span class="unavailable-label">No longer available</span>
+                  }
+                  @if (line.quantity > line.product.stock) {
+                    <span class="unavailable-label">Only {{ line.product.stock }} in stock; checkout will fail until you lower the quantity.</span>
+                  }
+                </div>
+                <div class="qty" role="group" [attr.aria-label]="'Quantity of ' + line.product.name">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [disabled]="line.quantity <= 1 || cart.isBusy(line.product._id)"
+                    (click)="setQuantity(line, line.quantity - 1)"
+                    [attr.aria-label]="'Decrease quantity of ' + line.product.name"
+                  >
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <span class="qty-value" aria-live="polite">{{ line.quantity }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [disabled]="line.quantity >= maxQuantity(line) || cart.isBusy(line.product._id)"
+                    (click)="setQuantity(line, line.quantity + 1)"
+                    [attr.aria-label]="'Increase quantity of ' + line.product.name"
+                  >
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="remove"
+                  [disabled]="cart.isBusy(line.product._id)"
+                  (click)="remove(line.product._id, line.product.name)"
+                  [attr.aria-label]="'Remove ' + line.product.name + ' from cart'"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+          <button mat-button type="button" class="clear" (click)="clear()"><mat-icon>remove_shopping_cart</mat-icon> Empty cart</button>
+        </section>
+
+        <aside class="summary surface" aria-labelledby="summary-title">
+          <h2 id="summary-title">Summary</h2>
+          <div class="summary-row">
+            <span>Items</span><span>{{ cart.count() }}</span>
+          </div>
+          <div class="summary-row total">
+            <span>Estimated subtotal</span><span>{{ cart.estimatedSubtotal() | money }}</span>
+          </div>
+          <p class="muted note">
+            Coupons are applied and the final total is calculated by our servers when you place the order. You will see it before
+            paying.
+          </p>
+          <a mat-flat-button class="checkout" routerLink="/checkout" [class.disabled]="!canCheckout()" [attr.aria-disabled]="!canCheckout()"
+            [tabindex]="canCheckout() ? 0 : -1">Go to checkout</a>
+        </aside>
+      </div>
+    }
+  </app-async-state>
+</div>

@@ -1,19 +1,35 @@
-FROM node:18-alpine
+# --- build: compile TypeScript ---
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --production
+RUN yarn install --frozen-lockfile
 
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
+RUN yarn build
+
+# --- runtime: production dependencies + compiled output only ---
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production && yarn cache clean
+
+COPY --from=build /app/dist ./dist
 
 ENV NODE_ENV=production
+# Listen on all container interfaces (the app now honours APP_IP_ADDRESS). Behind a reverse proxy,
+# also set TRUST_PROXY to its address or hop count; it defaults to off.
+ENV APP_IP_ADDRESS=0.0.0.0
 EXPOSE 5000
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
+RUN mkdir -p uploads logs && addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.APP_PORT || 5000) + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["yarn", "start"]
+CMD ["node", "dist/server.js"]

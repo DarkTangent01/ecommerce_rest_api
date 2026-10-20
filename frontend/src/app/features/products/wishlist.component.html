@@ -1,0 +1,34 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Account</p>
+      <h1>Wishlist</h1>
+    </div>
+  </header>
+  <app-async-state [state]="state()" loadingLabel="Loading wishlist" (retry)="wishlist.load()">
+    @if (wishlist.products().length) {
+      <ul class="items">
+        @for (product of wishlist.products(); track product._id) {
+          <li class="item surface">
+            <img [src]="product.image" alt="" width="80" height="80" loading="lazy" />
+            <div class="info">
+              <a [routerLink]="['/products', product._id]">{{ product.name }}</a>
+              <span>{{ product.price | money }}</span>
+              <app-stock-badge [stock]="product.stock" />
+            </div>
+            <div class="item-actions">
+              <button mat-flat-button type="button" [disabled]="product.stock <= 0" (click)="moveToCart(product._id)">Add to cart</button>
+              <button mat-icon-button type="button" (click)="remove(product._id)" [attr.aria-label]="'Remove ' + product.name + ' from wishlist'">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state icon="favorite" title="Your wishlist is empty" description="Tap the heart on any product to save it here.">
+        <a mat-flat-button routerLink="/products">Browse products</a>
+      </app-empty-state>
+    }
+  </app-async-state>
+</div>
