@@ -1,11 +1,12 @@
 import type { ClientSession, FilterQuery, HydratedDocument } from "mongoose";
 import { Cart, Coupon, CouponRedemption, InventoryReservation, Order, Product } from "../models/index.js";
 import { CustomeErrorHandler } from "./index.js";
-import { INVENTORY_RESERVATION_MINUTES } from "../config/index.js";
+import { INVENTORY_RESERVATION_MINUTES, REFUND_WINDOW_DAYS } from "../config/index.js";
+import { CANCELLABLE_STATUSES, REFUNDABLE_STATUSES } from "./orderStateMachine.js";
 import { validateCouponForUser } from "./couponService.js";
 import { queueNotification } from "./notificationService.js";
 import { releaseOrderReservations } from "./inventoryService.js";
-import { publishEvent } from "../infra/events/eventBus.js";
+import { dispatchEvent, publishEvent, recordEvent } from "../infra/events/eventBus.js";
 import { startOrderSaga } from "../infra/saga/sagaOrchestrator.js";
 import { withDistributedLock } from "../infra/locks/distributedLock.js";
 import { runInTransaction, sessionOption } from "../infrastructure/database/transaction.js";
@@ -30,8 +31,6 @@ export interface ReasonInput {
 
 type OrderDoc = HydratedDocument<OrderShape>;
 type ReservationDoc = HydratedDocument<Reservation>;
-
-const CANCELLABLE_STATUSES: OrderShape["status"][] = ["pending", "confirmed"];
 
 class OrderService {
   /**
@@ -218,38 +217,132 @@ class OrderService {
     return order;
   }
 
+  /**
+   * Cancels a pending or confirmed order and returns its stock exactly once. A captured payment is
+   * never kept silently (SEC-05): cancelling a paid order also opens its refund, and the
+   * refund.requested event commits in the same transaction as the cancellation (outbox).
+   */
   async cancel(req: AuthedRequest, value: ReasonInput) {
-    const { result: order } = await runInTransaction(async (session) => {
-      // Atomic transition: two concurrent cancels cannot both release the stock.
-      const cancelled = await Order.findOneAndUpdate(
-        { ...this.ownedOrderFilter(req), status: { $in: CANCELLABLE_STATUSES } },
-        { $set: { status: "cancelled", cancelledAt: new Date(), cancellationReason: value.reason } },
+    const now = new Date();
+    const cancelledFields = { status: "cancelled", cancelledAt: now, cancellationReason: value.reason };
+    const { result } = await runInTransaction(async (session) => {
+      const base = { ...this.ownedOrderFilter(req), status: { $in: CANCELLABLE_STATUSES } };
+      // Each update is a compare-and-set, so concurrent cancels, payments and expiry cannot all win.
+      let cancelled = await Order.findOneAndUpdate(
+        { ...base, paymentStatus: { $in: ["unpaid", "failed"] } },
+        { $set: cancelledFields },
         { new: true, ...sessionOption(session) }
       );
+      let refundOpened = false;
+      if (!cancelled) {
+        cancelled = await Order.findOneAndUpdate(
+          { ...base, paymentStatus: { $in: ["paid", "authorized"] }, refundStatus: "none" },
+          { $set: { ...cancelledFields, refundStatus: "requested", refundRequestedAt: now, refundReason: value.reason } },
+          { new: true, ...sessionOption(session) }
+        );
+        refundOpened = Boolean(cancelled);
+      }
       if (!cancelled) {
         const exists = await Order.exists(this.ownedOrderFilter(req)).session(session);
         if (!exists) throw CustomeErrorHandler.notFound("Order not found");
         throw CustomeErrorHandler.badRequest("Order cannot be cancelled in its current state");
       }
       await releaseOrderReservations(cancelled._id, session);
-      return cancelled;
+
+      const events = [
+        await recordEvent(
+          { type: "order.cancelled", aggregateType: "order", aggregateId: cancelled._id, tenant: req.tenant, payload: { reason: value.reason }, req },
+          session
+        ),
+      ];
+      if (refundOpened) {
+        events.push(
+          await recordEvent(
+            {
+              type: "refund.requested",
+              aggregateType: "order",
+              aggregateId: cancelled._id,
+              tenant: req.tenant,
+              payload: { reason: value.reason, cause: "cancelled_after_payment", amount: cancelled.total },
+              req,
+            },
+            session
+          )
+        );
+      }
+      return { order: cancelled, events, refundOpened };
     });
 
-    auditLogger("order.cancel", req, { order: order._id, reason: value.reason });
-    await publishEvent({ type: "order.cancelled", aggregateType: "order", aggregateId: order._id, tenant: req.tenant, payload: { reason: value.reason }, req });
-    return order;
+    auditLogger("order.cancel", req, { order: result.order._id, reason: value.reason, refundOpened: result.refundOpened });
+    await this.dispatchAll(result.events, req);
+    return result.order;
   }
 
+  /**
+   * Opens a refund for a delivered, paid order within REFUND_WINDOW_DAYS, once (SEC-05). It used to
+   * accept any paid order at any time and overwrite the fulfilment status with "refund_requested".
+   * The fulfilment status is left alone; the refund is tracked in refundStatus.
+   */
   async requestRefund(req: AuthedRequest, value: ReasonInput) {
-    const order = await Order.findOne(this.ownedOrderFilter(req));
-    if (!order) throw CustomeErrorHandler.notFound("Order not found");
-    if (order.paymentStatus !== "paid") throw CustomeErrorHandler.badRequest("Only paid orders can be refunded");
-    order.status = "refund_requested";
-    order.refundStatus = "requested";
-    await order.save();
-    auditLogger("order.refund.request", req, { order: order._id, reason: value.reason });
-    await publishEvent({ type: "refund.requested", aggregateType: "order", aggregateId: order._id, tenant: req.tenant, payload: { reason: value.reason }, req });
-    return order;
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const { result } = await runInTransaction(async (session) => {
+      const order = await Order.findOneAndUpdate(
+        {
+          ...this.ownedOrderFilter(req),
+          paymentStatus: "paid",
+          refundStatus: "none",
+          status: { $in: REFUNDABLE_STATUSES },
+          // Orders delivered before deliveredAt existed fall back to their last update.
+          $or: [{ deliveredAt: { $gte: windowStart } }, { deliveredAt: { $exists: false }, updatedAt: { $gte: windowStart } }],
+        },
+        { $set: { refundStatus: "requested", refundRequestedAt: now, refundReason: value.reason } },
+        { new: true, ...sessionOption(session) }
+      );
+      if (!order) throw await this.refundRejection(req, windowStart, session);
+      const event = await recordEvent(
+        {
+          type: "refund.requested",
+          aggregateType: "order",
+          aggregateId: order._id,
+          tenant: req.tenant,
+          payload: { reason: value.reason, cause: "customer_request", amount: order.total },
+          req,
+        },
+        session
+      );
+      return { order, event };
+    });
+
+    auditLogger("order.refund.request", req, { order: result.order._id, reason: value.reason });
+    await this.dispatchAll([result.event], req);
+    return result.order;
+  }
+
+  /** Explains why a refund request did not match, using the same ownership filter (no existence leak). */
+  private async refundRejection(req: AuthedRequest, windowStart: Date, session: ClientSession | null) {
+    const order = await Order.findOne(this.ownedOrderFilter(req)).session(session);
+    if (!order) return CustomeErrorHandler.notFound("Order not found");
+    if (order.refundStatus !== "none") return CustomeErrorHandler.conflict("A refund has already been requested for this order");
+    if (order.paymentStatus !== "paid") return CustomeErrorHandler.badRequest("Only paid orders can be refunded");
+    if (!REFUNDABLE_STATUSES.includes(order.status)) {
+      return CustomeErrorHandler.badRequest("Refunds can be requested once the order is delivered; cancel it instead if it has not shipped");
+    }
+    if ((order.deliveredAt ?? order.updatedAt) < windowStart) {
+      return CustomeErrorHandler.badRequest(`The refund window of ${REFUND_WINDOW_DAYS} days has passed`);
+    }
+    return CustomeErrorHandler.conflict("The order changed while processing the refund; retry");
+  }
+
+  /** Post-commit delivery: the events are durable already, so a queue failure is logged, not thrown. */
+  private async dispatchAll(events: Parameters<typeof dispatchEvent>[0][], req: AuthedRequest) {
+    for (const event of events) {
+      try {
+        await dispatchEvent(event, req);
+      } catch (err) {
+        logEvent("error", "domain.event.dispatch_failed", req, { event: event._id, type: event.type, error: (err as Error).message });
+      }
+    }
   }
 }
 

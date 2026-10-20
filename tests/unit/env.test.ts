@@ -99,4 +99,9 @@ describe("parseEnv", () => {
       );
     });
   });
+
+  it("refuses DEBUG_MODE in production (SEC-13)", () => {
+    expect(problemsFor({ ...productionEnv, DEBUG_MODE: "true" })).toEqual(["DEBUG_MODE: must be false in production"]);
+    expect(parseEnv({ NODE_ENV: "development", DEBUG_MODE: "true" }, silent).DEBUG_MODE).toBe(true);
+  });
 });

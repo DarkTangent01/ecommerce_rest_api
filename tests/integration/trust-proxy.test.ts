@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/server.js";
-import { authLimiter } from "../../src/middlewares/rateLimiters.js";
+import { authLimiter, loginAccountKey } from "../../src/middlewares/rateLimiters.js";
 import { clearDb, startDb, stopDb } from "../helpers/db.js";
 import { api, createUser } from "../helpers/factories.js";
 
@@ -10,6 +10,37 @@ beforeEach(() => clearDb());
 
 const failLogin = (email: string, ip: string) =>
   api().post("/api/login").set("X-Forwarded-For", ip).send({ email, password: "Wrong-password-1" });
+
+describe("trusted proxy configured (SEC-01)", () => {
+  it("uses X-Forwarded-For only from a trusted proxy hop", async () => {
+    const previous = app.get("trust proxy") as unknown;
+    app.set("trust proxy", "loopback");
+    try {
+      // The test client connects over loopback, so it plays the trusted proxy here: each request's
+      // forwarded client IP gets its own budget, as real clients behind the proxy would.
+      const statuses: number[] = [];
+      for (let i = 0; i < 12; i++) statuses.push((await failLogin(`nobody-${i}@example.com`, `203.0.113.${i + 1}`)).status);
+      expect(statuses.every((status) => status === 401)).toBe(true);
+    } finally {
+      app.set("trust proxy", previous);
+    }
+  });
+});
+
+describe("account limiter keys (SEC-01)", () => {
+  it("hashes the normalised email and never stores it raw", () => {
+    const key = loginAccountKey("  Alice@Example.COM ");
+    expect(key).toBe(loginAccountKey("alice@example.com"));
+    expect(key).toMatch(/^login:[0-9a-f]{64}$/);
+    expect(key).not.toContain("alice");
+  });
+
+  it("puts non-email and oversized input into one bucket", () => {
+    expect(loginAccountKey({ $ne: 1 })).toBe("login:invalid");
+    expect(loginAccountKey(`${"a".repeat(300)}@example.com`)).toBe("login:invalid");
+    expect(loginAccountKey("")).toBe("login:invalid");
+  });
+});
 
 describe("client IP and X-Forwarded-For (SEC-01)", () => {
   it("does not trust X-Forwarded-For unless TRUST_PROXY is set", () => {

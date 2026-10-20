@@ -118,6 +118,9 @@ export interface Order extends Timestamps {
   paymentReference?: string;
   paymentStateHistory: PaymentTransition[];
   shippingAddress: Address;
+  deliveredAt?: Date;
+  refundRequestedAt?: Date;
+  refundReason?: string;
   cancelledAt?: Date;
   cancellationReason?: string;
   deletedAt: Date | null;
@@ -128,6 +131,7 @@ export interface Payment extends Timestamps {
   _id: ObjectId;
   provider: string;
   eventId: string;
+  signedDigest?: string;
   order?: ObjectId;
   type: string;
   payloadHash: string;

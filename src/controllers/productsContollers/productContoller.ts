@@ -25,7 +25,9 @@ const storage = multer.diskStorage({
 
 const handleMultiPartData = multer({
   storage,
-  limits: { fileSize: UPLOAD_MAX_BYTES, files: 1 },
+  // Bounds every part of the multipart body, not just the file (DEP-01 hardening): a product form
+  // has ~10 text fields, a 3000-char description and at most 100 JSON-encoded variants.
+  limits: { fileSize: UPLOAD_MAX_BYTES, files: 1, fields: 20, fieldSize: 64 * 1024, fieldNameSize: 100, parts: 25 },
   fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(ext)) {

@@ -127,6 +127,8 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   refundStatus: RefundStatus;
+  deliveredAt?: string;
+  refundRequestedAt?: string;
   paymentProvider?: string;
   paymentReference?: string;
   paymentStateHistory: PaymentTransition[];
@@ -200,10 +202,20 @@ export interface AdminAnalytics {
   reviews: number;
 }
 
+/**
+ * An order as a seller sees it: only the seller's own lines, and the delivery address only while a
+ * paid order is still to be shipped. No customer id, totals or payment history.
+ */
+export interface SellerOrderSummary extends Pick<Order, '_id' | 'status' | 'paymentStatus' | 'createdAt'> {
+  items: Pick<OrderItem, 'product' | 'name' | 'price' | 'quantity'>[];
+  sellerSubtotal: number;
+  shippingAddress?: Order['shippingAddress'];
+}
+
 /** GET /seller/dashboard. */
 export interface SellerDashboard {
   productCount: number;
-  recentOrders: Order[];
+  recentOrders: SellerOrderSummary[];
   revenue: number;
   lowStock: Pick<Product, '_id' | 'name' | 'stock' | 'price' | 'ratingAverage' | 'ratingCount'>[];
 }

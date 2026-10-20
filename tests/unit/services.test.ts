@@ -63,7 +63,7 @@ describe("PaymentService", () => {
     service.verifyWebhook = () => undefined;
 
     const result = await service.processWebhook({
-      headers: { provider: "test", eventId: "evt-1" },
+      headers: { provider: "manual", eventId: "evt-1" },
       body: { orderId: "order-1", type: "payment.succeeded" },
       rawPayload: "{}",
       req: {},

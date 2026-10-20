@@ -23,8 +23,15 @@ export const recordSecuritySignal = async ({
   metadata?: Record<string, unknown>;
 }) => SecuritySignal.create({ type, severity, user, tenant, ip, metadata });
 
-export const deviceIdFor = (req: Pick<Request, "get" | "ip">): string =>
-  req.get("X-Device-Id") || crypto.createHash("sha256").update(`${req.get("user-agent") || "unknown"}:${req.ip}`).digest("hex");
+/**
+ * Names the session row for this device. Only a label, never an authorization input (SEC-02): a
+ * plain client id up to 128 chars is kept, anything else falls back to a user-agent/IP hash.
+ */
+export const deviceIdFor = (req: Pick<Request, "get" | "ip">): string => {
+  const claimed = req.get("X-Device-Id");
+  if (claimed && /^[A-Za-z0-9._:-]{1,128}$/.test(claimed)) return claimed;
+  return crypto.createHash("sha256").update(`${req.get("user-agent") || "unknown"}:${req.ip}`).digest("hex");
+};
 
 export const trackSession = async ({ user, refreshToken, req }: { user: { _id: Id }; refreshToken?: Id; req: Request }) => {
   const deviceId = deviceIdFor(req);
@@ -38,12 +45,16 @@ export const trackSession = async ({ user, refreshToken, req }: { user: { _id: I
   return UserSession.findOneAndUpdate(
     { user: user._id, deviceId },
     {
-      ...(refreshToken && { refreshToken }),
-      userAgent: req.get("user-agent"),
-      ip: req.ip,
-      riskScore,
-      stepUpRequired: riskScore >= 70,
-      lastSeenAt: new Date(),
+      $set: {
+        ...(refreshToken && { refreshToken }),
+        userAgent: req.get("user-agent")?.slice(0, 300),
+        ip: req.ip,
+        riskScore,
+        stepUpRequired: riskScore >= 70,
+        lastSeenAt: new Date(),
+      },
+      // Signing in again on a device reopens its session row, which a logout had revoked.
+      $unset: { revokedAt: 1 },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );

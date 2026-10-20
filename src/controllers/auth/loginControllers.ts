@@ -44,7 +44,7 @@ class LoginController {
 
     try {
       assertAuthed(req);
-      await this.authService.logout(value.refresh_token, req.user._id);
+      await this.authService.logout(value.refresh_token, req.user._id, req.sessionId);
     } catch {
       return next(CustomeErrorHandler.serverError("Something went wrong in the database"));
     }

@@ -13,6 +13,8 @@ import { logEvent } from "../utils/requestContext.js";
 import { publishEvent } from "../infra/events/eventBus.js";
 import { emitAlert } from "../observability/metrics.js";
 import { objectIdString, validate } from "../validators/common.js";
+import { WEBHOOK_PROVIDERS } from "../config/index.js";
+import { Tenant } from "../models/index.js";
 import type { Order, PaymentStatus } from "../types/domain.js";
 
 export interface WebhookHeaders {
@@ -39,6 +41,13 @@ const TARGET_STATE: Record<z.infer<typeof webhookBodySchema>["type"], PaymentSta
 const nextOrderStatus = (order: Pick<Order, "status">, to: PaymentStatus): Order["status"] =>
   to === "paid" && order.status === "pending" ? "confirmed" : order.status;
 
+const trustedProviders = () =>
+  new Set(
+    WEBHOOK_PROVIDERS.split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+  );
+
 class PaymentService {
   repository: PaymentRepository;
 
@@ -59,7 +68,7 @@ class PaymentService {
   }
 
   async processWebhook({ headers, body, rawPayload, req }: { headers: WebhookHeaders; body: unknown; rawPayload: string; req: Partial<Request> }) {
-    const provider = headers.provider || "manual";
+    const provider = (headers.provider || "manual").trim().toLowerCase();
     const eventId = headers.eventId;
 
     if (!eventId) {
@@ -67,8 +76,14 @@ class PaymentService {
     }
 
     this.verifyWebhook({ rawPayload, signature: headers.signature, timestamp: headers.timestamp });
+    if (!trustedProviders().has(provider)) {
+      throw CustomeErrorHandler.unAuthorized("Unknown payment provider");
+    }
 
-    const existing = await this.repository.findEvent(provider, eventId);
+    // The event id and provider headers are not signed; the digest of the signed content is the
+    // dedupe key that a replay under a new id cannot change (SEC-11).
+    const signedDigest = this.hashPayload(`${headers.timestamp}.${rawPayload}`);
+    const existing = await this.repository.findEvent(provider, eventId, signedDigest);
     if (existing) {
       return { replay: true as const };
     }
@@ -79,6 +94,13 @@ class PaymentService {
 
     const order = await this.repository.findOrderById(orderId);
     if (!order) {
+      throw CustomeErrorHandler.notFound("Order not found");
+    }
+    // The provider must be the one the order's tenant pays through, so one tenant's provider
+    // cannot settle another tenant's orders.
+    const tenant = await Tenant.findOne({ key: order.tenant }).select("config.paymentProvider").lean();
+    if ((tenant?.config?.paymentProvider || "manual").toLowerCase() !== provider) {
+      await recordSecuritySignal({ type: "payment.provider_mismatch", severity: "high", tenant: order.tenant, metadata: { order: order._id, provider, eventId } });
       throw CustomeErrorHandler.notFound("Order not found");
     }
 
@@ -104,7 +126,8 @@ class PaymentService {
           {
             orderId: order._id,
             from: { paymentStatus: order.paymentStatus, status: order.status },
-            to: { paymentStatus: targetState, status: nextOrderStatus(order, targetState) },
+            // A provider refund completes any open refund request (or records one done provider-side).
+            to: { paymentStatus: targetState, status: nextOrderStatus(order, targetState), ...(targetState === "refunded" && { refundStatus: "processed" as const }) },
             reason: type,
             provider,
             paymentReference,
@@ -121,7 +144,7 @@ class PaymentService {
         await releaseOrderReservations(order._id, session);
       }
 
-      await this.repository.createEvent({ provider, eventId, order: order._id, type, payloadHash: this.hashPayload(rawPayload) }, session);
+      await this.repository.createEvent({ provider, eventId, order: order._id, type, payloadHash: this.hashPayload(rawPayload), signedDigest }, session);
       return current;
     });
 

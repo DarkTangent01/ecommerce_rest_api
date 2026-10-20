@@ -53,10 +53,12 @@ await run('SEC-03', 'Seller dashboard exposes customer PII and other sellers\' l
   const dash = await h.must('GET', '/seller/dashboard', { token: users.seller.token });
   const leaked = dash.recentOrders.find((o) => o._id === aliceOrder._id);
   const foreignItem = leaked?.items.find((i) => i.product === lamp._id);
+  // Vulnerable if any of: another seller's line, the customer id, order totals, or the address of an unpaid order.
+  const exposed = Boolean(foreignItem || leaked?.user || leaked?.total !== undefined || leaked?.shippingAddress);
   done(
-    Boolean(leaked?.shippingAddress && foreignItem),
+    exposed,
     leaked
-      ? `seller sees order ${leaked._id}: user=${leaked.user}, shippingAddress.line1="${leaked.shippingAddress.line1}", total=${leaked.total}, foreign item "${foreignItem?.name}"`
+      ? `seller sees order ${leaked._id}: items=[${leaked.items.map((i) => i.name).join(', ')}], user=${leaked.user ?? 'hidden'}, total=${leaked.total ?? 'hidden'}, address=${leaked.shippingAddress ? `"${leaked.shippingAddress.line1}"` : 'hidden (unpaid)'}`
       : 'order not in dashboard'
   );
 });
@@ -85,10 +87,10 @@ await run('SEC-05', 'Refund request ignores fulfilment state (delivered -> refun
   const delivered = await h.must('GET', `/orders/${aliceOrder._id}`, { token: users.alice.token });
   const r1 = await request('POST', `/orders/${aliceOrder._id}/refund`, { token: users.alice.token, body: { reason: 'poc' } });
   const r2 = await request('POST', `/orders/${aliceOrder._id}/refund`, { token: users.alice.token, body: { reason: 'poc again' } });
-  // The seller can then push it back to "shipped"/"delivered" since refund_requested has no rank.
+  // Vulnerable if the refund overwrites the fulfilment status, or a second refund is accepted.
   done(
-    delivered.status === 'delivered' && r1.status === 200 && r1.json.data.status === 'refund_requested',
-    `status before=${delivered.status}; refund -> ${r1.status} status=${r1.json?.data?.status} (a 2nd request -> ${r2.status} "${r2.json?.message}": domain-event key collision raised after the save)`
+    r1.json?.data?.status === 'refund_requested' || r2.status === 200,
+    `status before=${delivered.status}; refund -> ${r1.status} status=${r1.json?.data?.status} refundStatus=${r1.json?.data?.refundStatus}; 2nd request -> ${r2.status} "${r2.json?.message}"`
   );
 });
 
@@ -121,8 +123,8 @@ await run('SEC-06', 'No limit on concurrent SSE streams', async (done) => {
 await run('SEC-07', 'Self-registration into any tenant via X-Tenant-Id', async (done) => {
   const pw = h.PASSWORD;
   const reg = await request('POST', '/register', { body: { name: 'mallory', email: 'mallory@poc.test', password: pw, repeat_password: pw }, headers: { 'X-Tenant-Id': 'victim-corp' } });
-  const me = await h.must('GET', '/users', { token: reg.json.data.access_token });
-  done(me.tenant === 'victim-corp', `registered with X-Tenant-Id: victim-corp -> user.tenant=${me.tenant}`);
+  const me = reg.status === 201 ? await h.must('GET', '/users', { token: reg.json.data.access_token }) : null;
+  done(me?.tenant === 'victim-corp', `register with X-Tenant-Id: victim-corp -> ${reg.status} "${reg.json?.message}"${me ? `, user.tenant=${me.tenant}` : ''}`);
 });
 
 // SEC-08: one product in a multi-seller order lets the seller drive the whole order's fulfilment.
@@ -159,7 +161,8 @@ await run('SEC-09', 'Account enumeration via register response and login timing'
 await run('SEC-10', 'Unvalidated client X-Request-Id', async (done) => {
   const spoof = `admin-action-${'Z'.repeat(4000)}`;
   const r = await request('GET', '/health', { headers: { 'X-Request-Id': spoof } });
-  done(r.headers.get('x-request-id') === spoof, `4 KB X-Request-Id echoed back and used as the log/audit request id`);
+  const echoed = r.headers.get('x-request-id') === spoof;
+  done(echoed, echoed ? '4 KB X-Request-Id echoed back and used as the log/audit request id' : `client id ignored; server request id=${r.headers.get('x-request-id')}, correlation id=${(r.headers.get('x-correlation-id') ?? '').slice(0, 40)}`);
 });
 
 // SEC-11: webhook event id and provider are not covered by the signature.
@@ -177,10 +180,12 @@ await run('SEC-11', 'Webhook dedupe key (event id, provider) is outside the HMAC
     }).then(async (res) => ({ status: res.status, json: await res.json() }));
   const first = await send('evt-1', 'manual');
   const replaySame = await send('evt-1', 'manual');
-  const replayNew = await send('evt-2-attacker', 'attacker');
+  const replayNewId = await send('evt-2-attacker', 'manual');
+  const replayNewProvider = await send('evt-3-attacker', 'attacker');
+  const processedAgain = (res) => res.status === 200 && !res.json.data?.replay;
   done(
-    replaySame.json.data?.replay === true && replayNew.status === 200 && !replayNew.json.data?.replay,
-    `original -> ${first.status}; same event id -> replay=${replaySame.json.data?.replay}; same signed body with new event id/provider -> ${replayNew.status} processed again (accepted as a new event)`
+    replaySame.json.data?.replay === true && (processedAgain(replayNewId) || processedAgain(replayNewProvider)),
+    `original -> ${first.status}; same event id -> replay=${replaySame.json.data?.replay}; same signed body, new event id -> ${replayNewId.status} replay=${replayNewId.json.data?.replay ?? false}; new provider -> ${replayNewProvider.status} "${replayNewProvider.json.message}"`
   );
 });
 

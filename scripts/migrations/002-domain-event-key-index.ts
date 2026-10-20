@@ -18,7 +18,8 @@ const dryRun = process.argv.includes("--dry-run");
 await connectDatabase();
 try {
   const collection = DomainEvent.collection;
-  const indexes = await collection.indexes();
+  // A database that never stored an event has no collection yet.
+  const indexes = await collection.indexes().catch(() => []);
   const legacy = indexes.filter(
     (index) => index.name !== DOMAIN_EVENT_KEY_INDEX && index.key.type !== undefined && index.key.idempotencyKey !== undefined && !index.partialFilterExpression
   );
@@ -31,7 +32,20 @@ try {
     if (!dryRun && index.name) await collection.dropIndex(index.name);
   }
 
-  if (!dryRun) {
+  // Keyed events must be unique for the new index to build. Report conflicts; never delete events.
+  const duplicates = await collection
+    .aggregate<{ _id: { type: string; idempotencyKey: string }; count: number }>([
+      { $match: { idempotencyKey: { $type: "string" } } },
+      { $group: { _id: { type: "$type", idempotencyKey: "$idempotencyKey" }, count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+      { $limit: 20 },
+    ])
+    .toArray();
+  if (duplicates.length) {
+    console.error(`Found ${duplicates.length}+ duplicate keyed events; resolve them, then rerun:`);
+    for (const dup of duplicates) console.error(`  type=${dup._id.type} idempotencyKey=${dup._id.idempotencyKey} rows=${dup.count}`);
+    process.exitCode = 1;
+  } else if (!dryRun) {
     await DomainEvent.createIndexes();
     console.log(`Ensured partial unique index ${DOMAIN_EVENT_KEY_INDEX}.`);
   }

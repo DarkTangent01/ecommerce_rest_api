@@ -73,6 +73,8 @@ const baseSchema = z.object({
   APP_IP_ADDRESS: z.string().trim().min(1).default("127.0.0.1"),
   APP_URL: z.string().trim().optional(),
   DEBUG_MODE: bool(false),
+  /** Serve /openapi.json without authentication in production (I-4). */
+  EXPOSE_OPENAPI: bool(false),
   DB_URL: z.string().trim().optional(),
   JWT_SECRET: optionalSecret,
   REFRESH_SECRET: optionalSecret,
@@ -87,12 +89,19 @@ const baseSchema = z.object({
   BCRYPT_ROUNDS: int(12, { min: 4, max: 15 }),
   IDEMPOTENCY_TTL_HOURS: int(24, { min: 1 }),
   INVENTORY_RESERVATION_MINUTES: int(15, { min: 1 }),
+  REFUND_WINDOW_DAYS: int(30, { min: 1, max: 365 }),
+  SSE_MAX_STREAMS_PER_USER: int(3, { min: 1, max: 50 }),
+  SSE_MAX_STREAMS: int(1000, { min: 1 }),
+  SSE_MAX_LIFETIME_SECONDS: int(3600, { min: 30 }),
+  SSE_HEARTBEAT_SECONDS: int(25, { min: 1 }),
   RESERVATION_SWEEP_SECONDS: int(60, { min: 5 }),
   CACHE_TTL_SECONDS: int(60, { min: 1 }),
   CACHE_MAX_ENTRIES: int(1000, { min: 1 }),
   REDIS_URL: z.string().trim().default(""),
   QUEUE_BACKEND: z.enum(["memory", "bullmq"]).default("memory"),
   TRUST_PROXY: z.string().default("false"),
+  /** Comma-separated payment providers whose signed webhooks are accepted (SEC-11). */
+  WEBHOOK_PROVIDERS: z.string().trim().toLowerCase().default("manual"),
   ADMIN_IP_ALLOWLIST: z.string().default(""),
   ADMIN_IP_DENYLIST: z.string().default(""),
   SIGNED_URL_TTL_SECONDS: int(300, { min: 1 }),
@@ -158,6 +167,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv, { onWarning = console.warn }
   }
 
   if (!env.DB_URL && isProduction) problems.push("DB_URL: is required in production");
+  // Debug mode puts stack traces in 5xx responses (SEC-13).
+  if (isProduction && env.DEBUG_MODE) problems.push("DEBUG_MODE: must be false in production");
 
   const TRUST_PROXY = parseTrustProxy(env.TRUST_PROXY);
   if (typeof TRUST_PROXY === "object" && !Array.isArray(TRUST_PROXY)) problems.push(`TRUST_PROXY: ${TRUST_PROXY.error}`);

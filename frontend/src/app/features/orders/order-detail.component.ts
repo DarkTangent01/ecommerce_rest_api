@@ -38,8 +38,14 @@ export class OrderDetailComponent {
     return order.status === 'pending' || order.status === 'confirmed';
   }
 
+  /** Delivered, paid and no refund yet; the backend also enforces its refund window. Earlier orders are cancelled instead. */
   canRequestRefund(order: Order): boolean {
-    return order.paymentStatus === 'paid' && order.status !== 'refund_requested';
+    return order.paymentStatus === 'paid' && order.status === 'delivered' && order.refundStatus === 'none';
+  }
+
+  /** Refunds live in refundStatus; older orders may still carry the legacy "refund_requested" status. */
+  refundPending(order: Order): boolean {
+    return order.refundStatus === 'requested' || order.refundStatus === 'approved' || order.status === 'refund_requested';
   }
 
   cancel(order: Order): void {

@@ -16,7 +16,12 @@ const serviceAuth =
       if (!requiredScopes.every((scope) => scopes.includes(scope))) {
         return next(CustomeErrorHandler.forbidden("Service scope denied"));
       }
+      // The tenant comes from the signed token, never from the caller's X-Tenant-Id (I-7).
+      if (typeof payload.tenant !== "string" || !payload.tenant) {
+        return next(CustomeErrorHandler.forbidden("Service token is not scoped to a tenant"));
+      }
       req.service = payload.service;
+      req.tenant = payload.tenant;
       return next();
     } catch {
       return next(CustomeErrorHandler.unAuthorized("Invalid service token"));

@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { SellerApi } from '../../core/api/admin.api';
-import type { Order, Shipment } from '../../core/models';
+import type { SellerOrderSummary, Shipment } from '../../core/models';
 import { AsyncStateComponent } from '../../shared/components/async-state.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { StatusChipComponent } from '../../shared/components/status-chip.component';
@@ -32,11 +32,11 @@ export class SellerDashboardComponent {
   readonly state = computed(() => viewStateOf(this.dashboard));
   readonly error = computed(() => errorMessageOf(this.dashboard));
 
-  canShip(order: Order): boolean {
+  canShip(order: SellerOrderSummary): boolean {
     return order.paymentStatus === 'paid' && ['confirmed', 'processing', 'shipped'].includes(order.status);
   }
 
-  ship(order: Order): void {
+  ship(order: SellerOrderSummary): void {
     this.dialog
       .open<ShipmentDialogComponent, ShipmentDialogData, Shipment>(ShipmentDialogComponent, { data: { orderId: order._id } })
       .afterClosed()

@@ -18,6 +18,7 @@
     "validate": "node scripts/check-syntax.js",
     "migrate:reservations-ttl": "tsx scripts/migrations/001-drop-reservation-ttl.ts",
     "migrate:domain-event-index": "tsx scripts/migrations/002-domain-event-key-index.ts",
+    "migrate:shipment-per-seller": "tsx scripts/migrations/003-shipment-per-seller-index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "audit:deps": "yarn audit",
@@ -33,12 +34,12 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
-    "multer": "^2.0.0",
+    "mongoose": "^8.24.5",
+    "multer": "^2.4.0",
     "zod": "^4.6.7"
   },
   "resolutions": {

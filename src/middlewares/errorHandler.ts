@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { DEBUG_MODE } from "../config/index.js";
+import { DEBUG_MODE, NODE_ENV } from "../config/index.js";
 import { AppError } from "../shared/errors/AppError.js";
 import { errorResponse } from "../utils/apiResponse.js";
 import { RequestValidationError } from "../validators/common.js";
@@ -47,12 +47,17 @@ export const toAppError = (err: unknown): AppError => {
   if (httpErr.type === "entity.parse.failed") return new AppError(400, "Malformed JSON body");
   if (httpErr.type === "entity.too.large") return new AppError(413, "Request body too large");
   const status = httpErr.status ?? httpErr.statusCode;
-  if (httpErr.expose && typeof status === "number" && status >= 400 && status < 500) {
-    return new AppError(status, (err as Error).message);
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    // Non-exposed client errors (e.g. express.static's 404 for a missing file) keep their status
+    // but not their message, which can contain file system paths.
+    return httpErr.expose ? new AppError(status, (err as Error).message) : new AppError(status, status === 404 ? "Not found" : "Bad request");
   }
 
   return new AppError(500, "Internal server error");
 };
+
+/** Stack traces only ever reach clients in debug mode outside production (SEC-13). */
+export const shouldExposeStack = (debugMode: boolean, nodeEnv: string) => debugMode && nodeEnv !== "production";
 
 // Express identifies error middleware by its four-argument signature, so `_next` must stay.
 const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
@@ -65,7 +70,7 @@ const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunc
   }
 
   let details = appError.details;
-  if (DEBUG_MODE && appError.status >= 500) {
+  if (shouldExposeStack(DEBUG_MODE, NODE_ENV) && appError.status >= 500) {
     details = { stack: (err as Error | undefined)?.stack };
   }
 

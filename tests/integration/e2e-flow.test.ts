@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startDb, stopDb } from "../helpers/db.js";
-import { address, api, createUser, idempotencyKey, TENANT } from "../helpers/factories.js";
+import { address, api, createUser, ensureTenant, idempotencyKey, TENANT } from "../helpers/factories.js";
 import { sendWebhook } from "../helpers/webhooks.js";
 
 // The original end-to-end script (register -> sell -> buy -> pay -> ship -> report), now running
@@ -10,7 +10,10 @@ import { sendWebhook } from "../helpers/webhooks.js";
 
 let uploadedImage: string | undefined;
 
-beforeAll(() => startDb());
+beforeAll(async () => {
+  await startDb();
+  await ensureTenant();
+});
 afterAll(async () => {
   if (uploadedImage) await fs.rm(path.join(process.cwd(), new URL(uploadedImage).pathname.replace(/^\/+/, "")), { force: true });
   await stopDb();

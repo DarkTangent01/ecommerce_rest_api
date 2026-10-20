@@ -3,6 +3,9 @@ import { openApiController, platformController } from "./controller.js";
 import { admin, adminNetworkPolicy, apiKeyAuth, auth, sensitiveLimiter, serviceAuth, stepUpAuth } from "./policy.js";
 import { productController } from "../catalog/controller.js";
 import { successResponse } from "../../utils/apiResponse.js";
+import { EXPOSE_OPENAPI, NODE_ENV } from "../../config/index.js";
+
+export const openApiIsPublic = (nodeEnv: string, exposeOpenApi: boolean) => nodeEnv !== "production" || exposeOpenApi;
 
 export const registerPlatformRoutes = (router: Router) => {
   router.get("/health", (_req, res) => {
@@ -18,10 +21,12 @@ export const registerPlatformRoutes = (router: Router) => {
   router.get("/platform/security-headers", platformController.securityHeaders);
   router.get("/platform/signed-url", [auth, sensitiveLimiter], platformController.signedUrl);
   router.get("/platform/validate-signed-url", platformController.validateSignedUrl);
-  router.get("/platform/stream", auth, platformController.stream);
+  router.get("/platform/stream", [auth, sensitiveLimiter], platformController.stream);
   router.get("/internal/events", serviceAuth("events:read"), platformController.events);
   router.get("/integrations/products", apiKeyAuth("products:read"), productController.index);
-  router.get("/openapi.json", openApiController.show);
+  // The spec lists admin and internal routes. Public outside production; in production admins only
+  // unless EXPOSE_OPENAPI=true (I-4). Every route still enforces its own authorization.
+  router.get("/openapi.json", openApiIsPublic(NODE_ENV, EXPOSE_OPENAPI) ? [] : [auth, admin], openApiController.show);
   router.get("/api-keys", [auth, admin, adminNetworkPolicy], platformController.listApiKeys);
   router.post("/api-keys", [auth, admin, adminNetworkPolicy, stepUpAuth], platformController.createApiKey);
 };

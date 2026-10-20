@@ -139,6 +139,15 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 app.use("/api", routes);
 app.use("/api/v1", routes);
+// Public product images only (I-2): exactly the names the upload handler generates, served so the
+// browser can never run them as a page. Private files must not be stored in uploads/.
+const UPLOAD_NAME = /^\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpe?g|png|webp)$/;
+app.use("/uploads", (req: Request, res: Response, next: NextFunction) => {
+  if (!UPLOAD_NAME.test(req.path)) return next(CustomeErrorHandler.notFound("Route not found"));
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  return next();
+});
 app.use(
   "/uploads",
   express.static("uploads", {

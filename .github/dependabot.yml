@@ -1,0 +1,39 @@
+# Controlled dependency updates (SEC-14, DEP-01). Actions are pinned to commit SHAs in the
+# workflows; Dependabot proposes SHA bumps (keeping the version comment) as reviewable PRs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Skip releases younger than a week: compromised versions are usually caught by then.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Skip releases younger than a week: compromised versions are usually caught by then.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    # Skip releases younger than a week: compromised versions are usually caught by then.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5

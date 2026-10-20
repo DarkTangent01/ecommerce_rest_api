@@ -5,10 +5,12 @@ export interface ServiceTokenClaims {
   service: string;
   scopes: string[];
   type: "service";
+  /** The one tenant this token may act in (I-7). */
+  tenant: string;
 }
 
-export const createServiceToken = (service: string, scopes: string[] = []) =>
-  JwtService.sign({ service, scopes, type: "service" } satisfies ServiceTokenClaims, "5m", SERVICE_JWT_SECRET);
+export const createServiceToken = (service: string, scopes: string[] = [], tenant: string) =>
+  JwtService.sign({ service, scopes, type: "service", tenant } satisfies ServiceTokenClaims, "5m", SERVICE_JWT_SECRET);
 
 export const callInternalService = async ({
   service,
@@ -16,6 +18,7 @@ export const callInternalService = async ({
   method = "GET",
   body,
   scopes = [],
+  tenant,
   correlationId,
 }: {
   service: string;
@@ -23,10 +26,11 @@ export const callInternalService = async ({
   method?: string;
   body?: unknown;
   scopes?: string[];
+  tenant: string;
   correlationId?: string;
 }) => {
   const headers = {
-    Authorization: `Bearer ${createServiceToken(service, scopes)}`,
+    Authorization: `Bearer ${createServiceToken(service, scopes, tenant)}`,
     "Content-Type": "application/json",
     "X-Correlation-Id": correlationId || "",
   };

@@ -24,8 +24,10 @@
       @if (item.status === 'cancelled' && item.cancellationReason) {
         <p class="notice" role="status">Cancelled: {{ item.cancellationReason }}</p>
       }
-      @if (item.status === 'refund_requested') {
+      @if (refundPending(item)) {
         <p class="notice" role="status">Refund requested. We will update you once it has been reviewed.</p>
+      } @else if (item.refundStatus === 'processed') {
+        <p class="notice" role="status">Refunded.</p>
       }
 
       <div class="layout">

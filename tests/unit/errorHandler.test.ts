@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { describe, expect, it } from "vitest";
-import { toAppError } from "../../src/middlewares/errorHandler.js";
+import { shouldExposeStack, toAppError } from "../../src/middlewares/errorHandler.js";
 import { LockedError } from "../../src/infra/locks/distributedLock.js";
 import CustomeErrorHandler from "../../src/services/CustomeErrorHandler.js";
 import { AppError } from "../../src/shared/errors/AppError.js";
@@ -33,5 +33,22 @@ describe("toAppError", () => {
 
   it("hides unexpected error messages", () => {
     expect(toAppError(new Error("connection string mongodb://secret"))).toMatchObject({ status: 500, message: "Internal server error" });
+  });
+});
+
+describe("stack trace exposure (SEC-13)", () => {
+  it("never exposes stacks in production, even with DEBUG_MODE on", () => {
+    expect(shouldExposeStack(true, "production")).toBe(false);
+    expect(shouldExposeStack(false, "production")).toBe(false);
+    expect(shouldExposeStack(false, "development")).toBe(false);
+    expect(shouldExposeStack(true, "development")).toBe(true);
+  });
+
+  it("maps unknown errors to a generic 500 without internal details", () => {
+    const err = Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:27017 at /app/dist/db.js"), { code: "ECONNREFUSED" });
+    const appError = toAppError(err);
+    expect(appError.status).toBe(500);
+    expect(appError.message).toBe("Internal server error");
+    expect(JSON.stringify(appError.details ?? {})).not.toMatch(/ECONNREFUSED|\/app\//);
   });
 });

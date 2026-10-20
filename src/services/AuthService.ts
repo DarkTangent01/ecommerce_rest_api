@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import type { Request } from "express";
 import type { Types } from "mongoose";
 import { ACCESS_TOKEN_TTL, BCRYPT_ROUNDS, REFRESH_SECRET, REFRESH_TOKEN_TTL } from "../config/index.js";
@@ -8,6 +9,7 @@ import { UserSession } from "../models/index.js";
 import AuthRepository from "../repositories/AuthRepository.js";
 import type { Role } from "../types/domain.js";
 import { parseDurationMs } from "../utils/duration.js";
+import { assertSelfSignupAllowed } from "./tenantPolicy.js";
 
 export interface TokenPair {
   access_token: string;
@@ -28,6 +30,10 @@ export interface AccessTokenClaims {
    */
   sid?: string;
 }
+
+let dummyHash: Promise<string> | undefined;
+/** A hash at the configured cost, created once, compared against when the email is unknown. */
+const dummyPasswordHash = () => (dummyHash ??= bcrypt.hash(crypto.randomUUID(), BCRYPT_ROUNDS));
 
 class AuthService {
   repository: AuthRepository;
@@ -50,6 +56,7 @@ class AuthService {
   }
 
   async register({ name, email, password, tenant, req }: { name: string; email: string; password: string; tenant: string; req: Request }) {
+    await assertSelfSignupAllowed(tenant);
     const exists = await this.repository.userExistsByEmail(email);
     if (exists) {
       throw CustomeErrorHandler.alreadyExist("This email is already taken.");
@@ -69,6 +76,8 @@ class AuthService {
   async login({ email, password, tenant, ip, req }: { email: string; password: string; tenant: string; ip?: string; req: Request }) {
     const user = await this.repository.findUserByEmail(email, "+password role email name tenant");
     if (!user) {
+      // Same bcrypt work as a wrong password, so response time does not reveal registered emails (SEC-09).
+      await bcrypt.compare(password, await dummyPasswordHash());
       await recordSecuritySignal({ type: "auth.login_failed", severity: "medium", tenant, ip, metadata: { email } });
       throw CustomeErrorHandler.wrongCredentials();
     }
@@ -129,6 +138,10 @@ class AuthService {
 
     // Tokens issued before the sid claim existed find their session through the refresh token it holds.
     const sessionId = claims.sid ?? (await UserSession.findOne({ user: user._id, refreshToken: refreshToken._id }).select("_id"))?._id;
+    // A signed-out session cannot be revived with a refresh token that leaked or was kept (I-6).
+    if (sessionId && (await UserSession.exists({ _id: sessionId, revokedAt: { $exists: true } }))) {
+      throw CustomeErrorHandler.unAuthorized("Invalid refresh token");
+    }
     const tokens = this.createTokenPair(user, sessionId);
     const savedRefreshToken = await this.repository.createRefreshToken({
       token: tokens.refresh_token,
@@ -139,8 +152,10 @@ class AuthService {
     return tokens;
   }
 
-  async logout(refreshToken: string, userId: Types.ObjectId | string) {
+  /** Revokes the refresh token and the caller's session, which also stops its access token at once (I-6). */
+  async logout(refreshToken: string, userId: Types.ObjectId | string, sessionId?: string) {
     await this.repository.deleteRefreshTokenForUser(refreshToken, userId);
+    if (sessionId) await UserSession.updateOne({ _id: sessionId, user: userId }, { $set: { revokedAt: new Date() } });
   }
 }
 

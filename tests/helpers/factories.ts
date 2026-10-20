@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { Types } from "mongoose";
 import request from "supertest";
 import { app } from "../../src/server.js";
-import { Product, User, UserSession } from "../../src/models/index.js";
+import { Product, Tenant, User, UserSession } from "../../src/models/index.js";
 import { JwtService } from "../../src/services/index.js";
 import type { Role } from "../../src/types/domain.js";
 import {
@@ -24,6 +24,10 @@ export const resetRateLimits = () => {
     for (const ip of ["127.0.0.1", "::ffff:127.0.0.1", "::1"]) limiter.resetKey(ip);
   }
 };
+
+/** The tests' tenant exists and is open for sign-up, as a real store would be (SEC-07). */
+export const ensureTenant = (key = TENANT) =>
+  Tenant.updateOne({ key }, { $setOnInsert: { key, name: `Store ${key}`, status: "active" } }, { upsert: true });
 
 let counter = 0;
 const unique = () => `${Date.now().toString(36)}${(counter++).toString(36)}`;

@@ -1,7 +1,7 @@
 import type { ClientSession, Types } from "mongoose";
 import { InventoryReservation, Order, PaymentEvent } from "../models/index.js";
 import { sessionOption } from "../infrastructure/database/transaction.js";
-import type { Order as OrderShape, Payment, PaymentStatus } from "../types/domain.js";
+import type { Order as OrderShape, Payment, PaymentStatus, RefundStatus } from "../types/domain.js";
 
 type Id = Types.ObjectId | string;
 
@@ -9,18 +9,19 @@ export interface OrderTransition {
   orderId: Id;
   /** Expected current state; the update only applies if the order still matches it. */
   from: Pick<OrderShape, "paymentStatus" | "status">;
-  to: { paymentStatus: PaymentStatus; status: OrderShape["status"] };
+  to: { paymentStatus: PaymentStatus; status: OrderShape["status"]; refundStatus?: RefundStatus };
   reason: string;
   provider: string;
   paymentReference?: string;
 }
 
 class PaymentRepository {
-  findEvent(provider: string, eventId: string) {
-    return PaymentEvent.findOne({ provider, eventId });
+  /** An event already processed under this id, or with exactly the same signed content (SEC-11). */
+  findEvent(provider: string, eventId: string, signedDigest?: string) {
+    return PaymentEvent.findOne({ $or: [{ provider, eventId }, ...(signedDigest ? [{ signedDigest }] : [])] });
   }
 
-  createEvent(data: Pick<Payment, "provider" | "eventId" | "type" | "payloadHash"> & { order: Id }, session: ClientSession | null = null) {
+  createEvent(data: Pick<Payment, "provider" | "eventId" | "type" | "payloadHash" | "signedDigest"> & { order: Id }, session: ClientSession | null = null) {
     return PaymentEvent.create([data], sessionOption(session));
   }
 
@@ -39,6 +40,7 @@ class PaymentRepository {
         $set: {
           paymentStatus: to.paymentStatus,
           status: to.status,
+          ...(to.refundStatus && { refundStatus: to.refundStatus }),
           paymentProvider: provider,
           ...(paymentReference && { paymentReference }),
         },

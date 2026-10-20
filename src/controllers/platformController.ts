@@ -10,6 +10,10 @@ import { cache } from "../utils/cache.js";
 import { serviceCatalog } from "../architecture/services.js";
 import { assertAuthed } from "../types/http.js";
 import { apiKeySchema, validate } from "../validators/index.js";
+import { SSE_HEARTBEAT_SECONDS, SSE_MAX_LIFETIME_SECONDS, SSE_MAX_STREAMS, SSE_MAX_STREAMS_PER_USER } from "../config/index.js";
+import { StreamLimiter } from "../infra/sse/streamLimiter.js";
+
+export const streamLimiter = new StreamLimiter({ perUser: SSE_MAX_STREAMS_PER_USER, global: SSE_MAX_STREAMS });
 
 const queryString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
@@ -170,18 +174,41 @@ class PlatformController {
     );
   }
 
-  stream(req: Request, res: Response) {
+  /**
+   * Server-sent events. Each user may hold SSE_MAX_STREAMS_PER_USER streams and the process
+   * SSE_MAX_STREAMS in total; every stream ends after SSE_MAX_LIFETIME_SECONDS (clients reconnect).
+   * Unlimited streams used to let one user hold any number of sockets and timers (SEC-06).
+   */
+  stream(req: Request, res: Response, next: NextFunction) {
+    assertAuthed(req);
+    const release = streamLimiter.acquire(String(req.user._id));
+    if (!release) {
+      res.setHeader("Retry-After", "30");
+      return next(CustomeErrorHandler.toManyRequest("Too many open event streams"));
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.write(`event: connected\ndata: ${JSON.stringify({ requestId: req.requestId, tenant: req.tenant })}\n\n`);
-    // Keep proxies from timing the stream out, and release the socket when the client leaves.
-    const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), 25_000);
-    heartbeat.unref();
-    req.on("close", () => {
+    res.write(`retry: 5000\nevent: connected\ndata: ${JSON.stringify({ requestId: req.requestId, tenant: req.tenant })}\n\n`);
+
+    const finish = () => {
       clearInterval(heartbeat);
-      res.end();
-    });
+      clearTimeout(lifetime);
+      release();
+      if (!res.writableEnded) res.end();
+    };
+    // Keep proxies from timing the stream out; end it after its maximum lifetime.
+    const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), SSE_HEARTBEAT_SECONDS * 1000);
+    const lifetime = setTimeout(() => {
+      res.write("event: expired\ndata: {}\n\n");
+      finish();
+    }, SSE_MAX_LIFETIME_SECONDS * 1000);
+    heartbeat.unref();
+    lifetime.unref();
+    req.on("close", finish);
+    res.on("close", finish);
+    res.on("error", finish);
   }
 }
 

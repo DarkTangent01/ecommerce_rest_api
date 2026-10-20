@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dateish, requiredString } from "./common.js";
+import { boolish, dateish, requiredString } from "./common.js";
 
 export const tenantSchema = z.object({
   // Optional for compatibility; when present it must name the caller's own tenant.
@@ -11,6 +11,7 @@ export const tenantSchema = z.object({
       currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "must be an ISO 4217 code").optional(),
       locale: z.string().trim().max(20).optional(),
       paymentProvider: z.string().trim().max(80).optional(),
+      allowSelfSignup: boolish().optional(),
     })
     .optional(),
 });

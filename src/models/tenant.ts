@@ -11,6 +11,8 @@ export interface TenantRecord extends Timestamps {
     currency: string;
     locale: string;
     paymentProvider: string;
+    /** Whether anyone may create an account in this tenant (SEC-07). */
+    allowSelfSignup: boolean;
   };
 }
 
@@ -23,6 +25,7 @@ const tenantSchema = new Schema<TenantRecord>(
       currency: { type: String, default: "USD" },
       locale: { type: String, default: "en-US" },
       paymentProvider: { type: String, default: "manual" },
+      allowSelfSignup: { type: Boolean, default: true },
     },
   },
   { timestamps: true }

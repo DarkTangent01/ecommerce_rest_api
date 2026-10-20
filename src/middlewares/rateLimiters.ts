@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { CustomeErrorHandler } from "../services/index.js";
 import { redisClient } from "../infra/redis/redisClient.js";
@@ -16,6 +17,17 @@ const createLimiter = (windowMs: number, max: number, message: string) =>
 export const generalLimiter = createLimiter(15 * 60 * 1000, 300, "Too many requests, try again later.");
 export const authLimiter = createLimiter(15 * 60 * 1000, 10, "Too many authentication attempts, try again later.");
 /**
+ * Limiter key for an account: a fixed-length hash of the normalised email, so raw addresses never
+ * sit in the limiter store and an oversized email cannot make an oversized key. Inputs that are not
+ * a plausible email share one bucket (validation rejects them anyway).
+ */
+export const loginAccountKey = (email: unknown) => {
+  const normalised = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!normalised || normalised.length > 254) return "login:invalid";
+  return `login:${crypto.createHash("sha256").update(normalised).digest("hex")}`;
+};
+
+/**
  * Failed logins per account, whatever the client IP: an IP-keyed limit alone can be spread over
  * many addresses. Successful logins do not count, so a guessing attacker cannot lock the owner out
  * for longer than the window.
@@ -26,10 +38,7 @@ export const loginAccountLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  keyGenerator: (req) => {
-    const email = (req.body as { email?: unknown } | undefined)?.email;
-    return `login:${typeof email === "string" ? email.trim().toLowerCase() : ""}`;
-  },
+  keyGenerator: (req) => loginAccountKey((req.body as { email?: unknown } | undefined)?.email),
   handler(_req, _res, next) {
     return next(CustomeErrorHandler.toManyRequest("Too many failed sign-in attempts for this account, try again later."));
   },

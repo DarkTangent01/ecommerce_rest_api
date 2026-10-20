@@ -22,8 +22,9 @@ export const startDb = async ({ replSet = true }: { replSet?: boolean } = {}) =>
 export const clearDb = async () => {
   const collections = await mongoose.connection.db!.collections();
   await Promise.all(collections.map((collection) => collection.deleteMany({})));
-  const { resetRateLimits } = await import("./factories.js");
+  const { ensureTenant, resetRateLimits } = await import("./factories.js");
   resetRateLimits();
+  await ensureTenant();
 };
 
 export const stopDb = async () => {

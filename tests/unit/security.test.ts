@@ -153,10 +153,11 @@ describe("SSRF and upload guards", () => {
 
 describe("service tokens and signed URLs", () => {
   it("issues scoped service tokens", () => {
-    const token = createServiceToken("order", ["events:read"]);
-    const payload = JwtService.verify(token, SERVICE_JWT_SECRET) as { type: string; scopes: string[] };
+    const token = createServiceToken("order", ["events:read"], "acme");
+    const payload = JwtService.verify(token, SERVICE_JWT_SECRET) as { type: string; scopes: string[]; tenant: string };
     expect(payload.type).toBe("service");
     expect(payload.scopes).toEqual(["events:read"]);
+    expect(payload.tenant).toBe("acme");
   });
 
   it("round-trips a signed URL", () => {
