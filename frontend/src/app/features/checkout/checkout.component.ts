@@ -1,161 +1,142 @@
-import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { CartApiService, OrderApiService } from '../../core/api/domain-api.services';
-import { CartStateService } from '../../core/cart/cart-state.service';
-import { ToastService } from '../../shared/components/toast.service';
-import { Cart, Product } from '../../shared/models/api.models';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators, type ValidatorFn } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatStepperModule } from '@angular/material/stepper';
+import { Router, RouterLink } from '@angular/router';
+import { OrdersApi } from '../../core/api/orders.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { CartStore } from '../../core/cart/cart.store';
+import { RULES } from '../../core/config/validation';
+import { ApiError } from '../../core/http/api-error';
+import type { CheckoutRequest } from '../../core/models';
+import { AsyncStateComponent, type ViewState } from '../../shared/components/async-state.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { applyServerErrors, errorMessage } from '../../shared/forms/form-errors';
+import { notBlank } from '../../shared/forms/validators';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { CheckoutAttempt } from './idempotency';
+
+const required = (max: number): [string, ValidatorFn[]] => ['', [Validators.required, notBlank, Validators.maxLength(max)]];
 
 @Component({
   selector: 'app-checkout',
-  imports: [CurrencyPipe, ReactiveFormsModule],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <section class="checkout-page">
-      <div class="checkout-main">
-        <section class="checkout-step">
-          <span>1</span>
-          <div>
-            <p class="eyebrow">Delivery address</p>
-            <h1>Where should we ship it?</h1>
-          </div>
-        </section>
-
-        <form class="checkout-form" [formGroup]="form" (ngSubmit)="submit()">
-          <div class="form-grid two">
-            <label>Address line 1 <input formControlName="line1" /></label>
-            <label>Address line 2 <input formControlName="line2" /></label>
-            <label>City <input formControlName="city" /></label>
-            <label>State <input formControlName="state" /></label>
-            <label>Postal code <input formControlName="postalCode" /></label>
-            <label>Country <input formControlName="country" /></label>
-          </div>
-
-          <section class="checkout-step compact">
-            <span>2</span>
-            <div>
-              <p class="eyebrow">Offers</p>
-              <h2>Apply coupon</h2>
-            </div>
-          </section>
-          <label>Coupon code <input formControlName="couponCode" placeholder="WELCOME10" /></label>
-
-          <section class="checkout-step compact">
-            <span>3</span>
-            <div>
-              <p class="eyebrow">Payment</p>
-              <h2>Select payment method</h2>
-            </div>
-          </section>
-          <div class="payment-methods">
-            <label class="payment-option">
-              <input type="radio" formControlName="paymentProvider" value="manual" />
-              <strong>Manual payment</strong>
-              <small>Creates an unpaid order; provider webhook updates payment status.</small>
-            </label>
-            <label class="payment-option">
-              <input type="radio" formControlName="paymentProvider" value="razorpay" />
-              <strong>Razorpay reference</strong>
-              <small>Use when your payment provider integration calls the webhook.</small>
-            </label>
-          </div>
-
-          <button class="button primary wide" [disabled]="form.invalid || loading()" type="submit">
-            {{ loading() ? 'Placing order...' : 'Place order securely' }}
-          </button>
-        </form>
-      </div>
-
-      <aside class="summary-panel order-summary">
-        <h2>Order summary</h2>
-        @for (item of cart().items; track productOf(item.product)._id) {
-          <div class="mini-line">
-            <span>{{ productOf(item.product).name }} x {{ item.quantity }}</span>
-            <strong>{{ productOf(item.product).price * item.quantity | currency: 'USD' }}</strong>
-          </div>
-        }
-        <div class="summary-line">
-          <span>Subtotal</span><strong>{{ total() | currency: 'USD' }}</strong>
-        </div>
-        <div class="summary-line"><span>Delivery</span><strong>Free</strong></div>
-        <div class="summary-total">
-          <span>Payable now</span><strong>{{ total() | currency: 'USD' }}</strong>
-        </div>
-        <p class="muted">
-          Checkout sends a client-generated idempotency key required by the backend.
-        </p>
-      </aside>
-    </section>
-  `,
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatStepperModule,
+    AsyncStateComponent,
+    EmptyStateComponent,
+    MoneyPipe,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './checkout.component.html',
+  styleUrl: './checkout.component.scss',
 })
 export class CheckoutComponent {
-  private readonly fb = inject(FormBuilder);
-  private readonly orders = inject(OrderApiService);
-  private readonly cartApi = inject(CartApiService);
-  private readonly cartState = inject(CartStateService);
-  private readonly toast = inject(ToastService);
+  private readonly fb = inject(NonNullableFormBuilder);
+  private readonly orders = inject(OrdersApi);
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
-  readonly cart = signal<Cart>({ items: [] });
-  readonly loading = signal(false);
-  readonly form = this.fb.nonNullable.group({
-    line1: ['', Validators.required],
-    line2: '',
-    city: ['', Validators.required],
-    state: ['', Validators.required],
-    postalCode: ['', Validators.required],
-    country: ['', Validators.required],
-    couponCode: '',
-    paymentProvider: 'manual',
+  readonly cart = inject(CartStore);
+  readonly auth = inject(AuthService);
+
+  readonly rules = RULES;
+  readonly errorMessage = errorMessage;
+  private readonly attempt = new CheckoutAttempt();
+
+  readonly address = this.fb.group({
+    line1: required(RULES.address.line1),
+    line2: ['', Validators.maxLength(RULES.address.line2)],
+    city: required(RULES.address.city),
+    state: required(RULES.address.state),
+    postalCode: required(RULES.address.postalCode),
+    country: required(RULES.address.country),
   });
+  readonly couponCode = this.fb.control('', [Validators.maxLength(RULES.couponCode.max)]);
+
+  readonly placing = signal(false);
+  readonly orderError = signal<{ message: string; action?: 'cart' | 'signin' } | null>(null);
+
+  readonly state = computed<ViewState>(() => {
+    if (this.cart.status() === 'error') return 'error';
+    return this.cart.status() === 'loading' && this.cart.cart().items.length === 0 ? 'loading' : 'ready';
+  });
+  readonly blocked = computed(() => this.cart.isEmpty() || this.cart.unavailableLines().length > 0);
 
   constructor() {
-    this.form.patchValue({ couponCode: this.route.snapshot.queryParamMap.get('couponCode') ?? '' });
-    this.cartApi.get().subscribe((cart) => {
-      this.cart.set(cart);
-      this.cartState.set(cart);
+    this.cart.load();
+  }
+
+  placeOrder(): void {
+    this.address.markAllAsTouched();
+    if (this.address.invalid || this.couponCode.invalid || this.placing() || this.blocked()) return;
+
+    const body = this.buildRequest();
+    this.placing.set(true);
+    this.orderError.set(null);
+
+    this.orders.checkout(body, this.attempt.keyFor(body)).subscribe({
+      next: (order) => {
+        this.attempt.reset();
+        this.cart.load(); // the server emptied the cart
+        void this.router.navigate(['/checkout/complete', order._id]);
+      },
+      error: (error: unknown) => {
+        const apiError = ApiError.from(error);
+        this.attempt.failed(apiError);
+        this.placing.set(false);
+        this.handleError(apiError);
+      },
     });
   }
 
-  productOf(product: Product | string): Product {
-    return this.cartState.productOf(product);
+  private buildRequest(): CheckoutRequest {
+    const { line2, ...address } = this.address.getRawValue();
+    const trimmed = Object.fromEntries(Object.entries(address).map(([key, value]) => [key, value.trim()])) as Omit<CheckoutRequest['shippingAddress'], 'line2'>;
+    const coupon = this.couponCode.value.trim().toUpperCase();
+    // Only identifiers, the address and the coupon code are sent; the server prices the order.
+    return {
+      shippingAddress: { ...trimmed, ...(line2.trim() && { line2: line2.trim() }) },
+      ...(coupon && { couponCode: coupon }),
+    };
   }
 
-  total(): number {
-    return this.cart().items.reduce((sum, item) => {
-      const product = this.productOf(item.product);
-      return sum + (product.price || 0) * item.quantity;
-    }, 0);
-  }
-
-  submit(): void {
-    if (this.form.invalid) return;
-    const value = this.form.getRawValue();
-    this.loading.set(true);
-    this.orders
-      .checkout({
-        shippingAddress: {
-          line1: value.line1,
-          line2: value.line2,
-          city: value.city,
-          state: value.state,
-          postalCode: value.postalCode,
-          country: value.country,
-        },
-        paymentProvider: value.paymentProvider,
-        couponCode: value.couponCode,
-      })
-      .subscribe({
-        next: (order) => {
-          this.cartState.load();
-          this.toast.show('Order placed successfully', 'success');
-          void this.router.navigate(['/payments', order._id]);
-        },
-        error: (err) => {
-          this.loading.set(false);
-          this.toast.show(err.error?.message ?? 'Checkout failed', 'error');
-        },
+  private handleError(error: ApiError): void {
+    if (error.status === 422) {
+      const unmatched = applyServerErrors(this.address, error, {
+        'shippingAddress.line1': 'line1',
+        'shippingAddress.line2': 'line2',
+        'shippingAddress.city': 'city',
+        'shippingAddress.state': 'state',
+        'shippingAddress.postalCode': 'postalCode',
+        'shippingAddress.country': 'country',
       });
+      this.orderError.set({ message: unmatched.length ? unmatched.join(' ') : 'Please check the highlighted fields.' });
+      return;
+    }
+    if (error.status === 403 && /step-up/i.test(error.message)) {
+      this.orderError.set({
+        message: 'For your security we could not place this order from this session. Please sign out and sign in again, then retry.',
+        action: 'signin',
+      });
+      return;
+    }
+    if (/coupon/i.test(error.message)) {
+      this.couponCode.setErrors({ server: error.message });
+      this.couponCode.markAsTouched();
+      this.orderError.set({ message: error.message });
+      return;
+    }
+    if (/out of stock|unavailable|cart is empty/i.test(error.message)) {
+      this.orderError.set({ message: `${error.message}. Please review your cart.`, action: 'cart' });
+      return;
+    }
+    this.orderError.set({ message: error.message });
   }
 }

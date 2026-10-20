@@ -50,6 +50,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/checkout/checkout.component').then((m) => m.CheckoutComponent),
       },
       {
+        path: 'checkout/complete/:id',
+        title: 'Order placed',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/checkout/order-confirmation.component').then((m) => m.OrderConfirmationComponent),
+      },
+      {
         path: 'account',
         canActivate: [authGuard],
         children: [
