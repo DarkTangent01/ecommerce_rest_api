@@ -13,7 +13,7 @@ const auth = async (req: Request, _res: Response, next: NextFunction) => {
   const token = authHeader.split(" ")[1] ?? "";
 
   try {
-    const { _id, typ } = JwtService.verify<AccessTokenClaims>(token);
+    const { _id, typ, sid } = JwtService.verify<AccessTokenClaims>(token);
     if (typ && typ !== "access") {
       return next(CustomeErrorHandler.unAuthorized());
     }
@@ -31,6 +31,7 @@ const auth = async (req: Request, _res: Response, next: NextFunction) => {
       name: user.name,
       tenant: user.tenant,
     };
+    req.sessionId = typeof sid === "string" ? sid : undefined;
     req.tenant = user.tenant || req.tenant;
     next();
   } catch {

@@ -3,7 +3,8 @@ import type { Request } from "express";
 import type { Types } from "mongoose";
 import { ACCESS_TOKEN_TTL, BCRYPT_ROUNDS, REFRESH_SECRET, REFRESH_TOKEN_TTL } from "../config/index.js";
 import { CustomeErrorHandler, JwtService } from "./index.js";
-import { recordSecuritySignal, trackSession } from "./securityService.js";
+import { linkSessionToRefreshToken, recordSecuritySignal, trackSession } from "./securityService.js";
+import { UserSession } from "../models/index.js";
 import AuthRepository from "../repositories/AuthRepository.js";
 import type { Role } from "../types/domain.js";
 import { parseDurationMs } from "../utils/duration.js";
@@ -21,6 +22,11 @@ export interface AccessTokenClaims {
   role?: Role;
   /** Absent on tokens issued before this claim existed. */
   typ?: TokenType;
+  /**
+   * The UserSession this token belongs to. Step-up decisions are made for this session, never for a
+   * client-supplied device id (SEC-02). Absent on tokens issued before the claim existed.
+   */
+  sid?: string;
 }
 
 class AuthService {
@@ -35,8 +41,8 @@ class AuthService {
     return new Date(Date.now() + parseDurationMs(REFRESH_TOKEN_TTL));
   }
 
-  createTokenPair(user: { _id: Types.ObjectId; role: Role }): TokenPair {
-    const payload = { _id: user._id, role: user.role };
+  createTokenPair(user: { _id: Types.ObjectId; role: Role }, sessionId?: Types.ObjectId | string): TokenPair {
+    const payload = { _id: user._id, role: user.role, ...(sessionId && { sid: String(sessionId) }) };
     return {
       access_token: JwtService.sign({ ...payload, typ: "access" }, ACCESS_TOKEN_TTL),
       refresh_token: JwtService.sign({ ...payload, typ: "refresh" }, REFRESH_TOKEN_TTL, REFRESH_SECRET),
@@ -57,14 +63,7 @@ class AuthService {
       tenant,
     });
 
-    const tokens = this.createTokenPair(user);
-    const savedRefreshToken = await this.repository.createRefreshToken({
-      token: tokens.refresh_token,
-      user: user._id,
-      expiresAt: this.refreshExpiry(),
-    });
-    await trackSession({ user, refreshToken: savedRefreshToken._id, req });
-    return tokens;
+    return (await this.startSession(user, req)).tokens;
   }
 
   async login({ email, password, tenant, ip, req }: { email: string; password: string; tenant: string; ip?: string; req: Request }) {
@@ -80,13 +79,7 @@ class AuthService {
       throw CustomeErrorHandler.wrongCredentials();
     }
 
-    const tokens = this.createTokenPair(user);
-    const savedRefreshToken = await this.repository.createRefreshToken({
-      token: tokens.refresh_token,
-      user: user._id,
-      expiresAt: this.refreshExpiry(),
-    });
-    const session = await trackSession({ user, refreshToken: savedRefreshToken._id, req });
+    const { tokens, session } = await this.startSession(user, req);
     await recordSecuritySignal({
       type: "auth.login_succeeded",
       severity: session.stepUpRequired ? "medium" : "info",
@@ -97,6 +90,19 @@ class AuthService {
     });
 
     return { ...tokens, step_up_required: session.stepUpRequired };
+  }
+
+  /** Creates (or reuses, per device) the session first, so its id can be signed into both tokens. */
+  private async startSession(user: { _id: Types.ObjectId; role: Role }, req: Request) {
+    const session = await trackSession({ user, req });
+    const tokens = this.createTokenPair(user, session._id);
+    const savedRefreshToken = await this.repository.createRefreshToken({
+      token: tokens.refresh_token,
+      user: user._id,
+      expiresAt: this.refreshExpiry(),
+    });
+    await linkSessionToRefreshToken(session._id, savedRefreshToken._id);
+    return { tokens, session };
   }
 
   async refresh(refreshTokenValue: string): Promise<TokenPair> {
@@ -121,12 +127,15 @@ class AuthService {
       throw CustomeErrorHandler.unAuthorized("No user found!");
     }
 
-    const tokens = this.createTokenPair(user);
-    await this.repository.createRefreshToken({
+    // Tokens issued before the sid claim existed find their session through the refresh token it holds.
+    const sessionId = claims.sid ?? (await UserSession.findOne({ user: user._id, refreshToken: refreshToken._id }).select("_id"))?._id;
+    const tokens = this.createTokenPair(user, sessionId);
+    const savedRefreshToken = await this.repository.createRefreshToken({
       token: tokens.refresh_token,
       user: user._id,
       expiresAt: this.refreshExpiry(),
     });
+    if (sessionId) await linkSessionToRefreshToken(sessionId, savedRefreshToken._id);
     return tokens;
   }
 

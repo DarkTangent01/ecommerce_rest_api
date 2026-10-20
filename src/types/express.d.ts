@@ -18,6 +18,8 @@ declare global {
       apiKey?: { _id: unknown; tenant: string; scopes: string[] };
       /** Set by serviceAuth. */
       service?: string;
+      /** Set by auth from the token's `sid` claim. Undefined for tokens without one. */
+      sessionId?: string;
       /** Set by stepUpAuth. */
       sessionContext?: { stepUpRequired: boolean };
       /** Set by the idempotency middleware. */

@@ -26,7 +26,7 @@ export const recordSecuritySignal = async ({
 export const deviceIdFor = (req: Pick<Request, "get" | "ip">): string =>
   req.get("X-Device-Id") || crypto.createHash("sha256").update(`${req.get("user-agent") || "unknown"}:${req.ip}`).digest("hex");
 
-export const trackSession = async ({ user, refreshToken, req }: { user: { _id: Id }; refreshToken: Id; req: Request }) => {
+export const trackSession = async ({ user, refreshToken, req }: { user: { _id: Id }; refreshToken?: Id; req: Request }) => {
   const deviceId = deviceIdFor(req);
   const recentFailedLogins = await SecuritySignal.countDocuments({
     type: "auth.login_failed",
@@ -38,7 +38,7 @@ export const trackSession = async ({ user, refreshToken, req }: { user: { _id: I
   return UserSession.findOneAndUpdate(
     { user: user._id, deviceId },
     {
-      refreshToken,
+      ...(refreshToken && { refreshToken }),
       userAgent: req.get("user-agent"),
       ip: req.ip,
       riskScore,
@@ -48,6 +48,10 @@ export const trackSession = async ({ user, refreshToken, req }: { user: { _id: I
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 };
+
+/** Points a session at its current refresh token (set at sign-in, moved on every rotation). */
+export const linkSessionToRefreshToken = (sessionId: Id, refreshToken: Id) =>
+  UserSession.updateOne({ _id: sessionId }, { $set: { refreshToken, lastSeenAt: new Date() } });
 
 export const createApiKeyValue = () => `ek_${crypto.randomBytes(32).toString("hex")}`;
 export const hashApiKeyValue = (value: string) => crypto.createHash("sha256").update(value).digest("hex");

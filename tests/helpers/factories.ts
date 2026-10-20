@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { Types } from "mongoose";
 import request from "supertest";
 import { app } from "../../src/server.js";
-import { Product, User } from "../../src/models/index.js";
+import { Product, User, UserSession } from "../../src/models/index.js";
 import { JwtService } from "../../src/services/index.js";
 import type { Role } from "../../src/types/domain.js";
 import {
@@ -36,8 +36,10 @@ export const createUser = async ({ role = "user", tenant = TENANT, password = "P
     role,
     tenant,
   });
-  const token = JwtService.sign({ _id: user._id, role: user.role });
-  return { user, token, auth: { Authorization: `Bearer ${token}`, "X-Tenant-Id": tenant } };
+  // A real session, as login creates, so step-up protected routes see a normal-risk session.
+  const session = await UserSession.create({ user: user._id, deviceId: `test-${unique()}` });
+  const token = JwtService.sign({ _id: user._id, role: user.role, typ: "access", sid: String(session._id) });
+  return { user, token, session, auth: { Authorization: `Bearer ${token}`, "X-Tenant-Id": tenant } };
 };
 
 export const createProduct = async ({

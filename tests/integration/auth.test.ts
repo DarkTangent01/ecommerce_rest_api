@@ -106,33 +106,81 @@ describe("refresh tokens (audit M1, M2)", () => {
   });
 });
 
-describe("step-up authentication (audit H1)", () => {
-  it("blocks checkout from a risky session and ignores the client-controlled bypass header", async () => {
-    const { user, auth } = await createUser();
-    await UserSession.create({ user: user._id, deviceId: "device-1", stepUpRequired: true, riskScore: 80 });
-
-    const res = await api()
+describe("step-up authentication (audit H1, SEC-02)", () => {
+  const checkoutWith = (auth: Record<string, string>, headers: Record<string, string> = {}) =>
+    api()
       .post("/api/orders/checkout")
       .set(auth)
-      .set("X-Device-Id", "device-1")
-      .set("X-Step-Up-Verified", "true")
-      .set("Idempotency-Key", "step-up-key-0123456789")
+      .set(headers)
+      .set("Idempotency-Key", `step-up-${Math.random().toString(36).slice(2)}-0123456789`)
       .send({ shippingAddress: address });
+
+  it("blocks checkout from a risky session and ignores the client-controlled bypass header", async () => {
+    const { auth, session } = await createUser();
+    await UserSession.updateOne({ _id: session._id }, { $set: { stepUpRequired: true, riskScore: 80 } });
+
+    const res = await checkoutWith(auth, { "X-Step-Up-Verified": "true" });
     expect(res.status).toBe(403);
     expect(res.body.message).toBe("Step-up authentication required");
   });
 
+  it("cannot be bypassed by sending a different X-Device-Id (SEC-02)", async () => {
+    const { auth, session } = await createUser();
+    await UserSession.updateOne({ _id: session._id }, { $set: { stepUpRequired: true, riskScore: 80 } });
+
+    const res = await checkoutWith(auth, { "X-Device-Id": "a-device-with-no-session" });
+    expect(res.status).toBe(403);
+  });
+
+  it("fails closed for tokens without a session or with someone else's session (SEC-02)", async () => {
+    const { user } = await createUser();
+    const { session: otherSession } = await createUser();
+    const tenantHeader = { "X-Tenant-Id": TENANT };
+
+    const noSid = JwtService.sign({ _id: user._id, role: user.role, typ: "access" });
+    expect((await checkoutWith({ ...tenantHeader, Authorization: `Bearer ${noSid}` })).status).toBe(403);
+
+    const foreignSid = JwtService.sign({ _id: user._id, role: user.role, typ: "access", sid: String(otherSession._id) });
+    expect((await checkoutWith({ ...tenantHeader, Authorization: `Bearer ${foreignSid}` })).status).toBe(403);
+  });
+
   it("lets normal sessions through", async () => {
-    const { user, auth } = await createUser();
-    await UserSession.create({ user: user._id, deviceId: "device-2", stepUpRequired: false, riskScore: 10 });
-    const res = await api()
-      .post("/api/orders/checkout")
-      .set(auth)
-      .set("X-Device-Id", "device-2")
-      .set("Idempotency-Key", "normal-key-0123456789")
-      .send({ shippingAddress: address });
+    const { auth } = await createUser();
+    const res = await checkoutWith(auth);
     // Empty cart: past step-up and into the handler.
     expect(res.status).toBe(400);
     expect(res.body.message).toBe("Cart is empty");
+  });
+
+  it("flags a login after repeated failures and keeps blocking it on any device id (SEC-02)", async () => {
+    const { user } = await createUser();
+    for (let i = 0; i < 5; i++) {
+      await api().post("/api/login").send({ email: user.email, password: "Wrong-password-1" });
+    }
+    const login = await api().post("/api/login").set("X-Device-Id", "attacker-laptop").send({ email: user.email, password: "Password123" });
+    expect(login.body.data.step_up_required).toBe(true);
+
+    const auth = { Authorization: `Bearer ${login.body.data.access_token}`, "X-Tenant-Id": TENANT };
+    expect((await checkoutWith(auth, { "X-Device-Id": "attacker-laptop" })).status).toBe(403);
+    expect((await checkoutWith(auth, { "X-Device-Id": "brand-new-device" })).status).toBe(403);
+    expect((await checkoutWith(auth)).status).toBe(403);
+  });
+
+  it("keeps the session across refresh, including for refresh tokens issued before the sid claim", async () => {
+    const { user } = await createUser();
+    const login = await api().post("/api/login").send({ email: user.email, password: "Password123" });
+    const sid = (jwt.decode(login.body.data.access_token) as { sid: string }).sid;
+
+    const refreshed = await api().post("/api/refresh").send({ refresh_token: login.body.data.refresh_token });
+    expect((jwt.decode(refreshed.body.data.access_token) as { sid: string }).sid).toBe(sid);
+    const session = await UserSession.findById(sid);
+    expect(String(session!.refreshToken)).toBe(String((await RefreshToken.findOne({ token: hashRefreshToken(refreshed.body.data.refresh_token) }))!._id));
+
+    // A pre-SEC-02 refresh token has no sid; its session is found through the refresh token link.
+    const legacy = JwtService.sign({ _id: user._id, role: user.role, typ: "refresh" }, "7d", process.env.REFRESH_SECRET);
+    const row = await RefreshToken.create({ token: hashRefreshToken(legacy), user: user._id, expiresAt: new Date(Date.now() + 86_400_000) });
+    await UserSession.updateOne({ _id: sid }, { $set: { refreshToken: row._id } });
+    const migrated = await api().post("/api/refresh").send({ refresh_token: legacy });
+    expect((jwt.decode(migrated.body.data.access_token) as { sid: string }).sid).toBe(sid);
   });
 });
