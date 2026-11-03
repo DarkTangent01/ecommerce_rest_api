@@ -32,14 +32,14 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^4.22.3",
     "express-rate-limit": "^7.5.0",
-    "helmet": "^8.0.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.24.5",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "zod": "^4.6.7"
   },
   "resolutions": {
@@ -53,7 +53,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^4",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^1.4.12",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.13.0",
